@@ -45,10 +45,13 @@ irm https://raw.githubusercontent.com/alpha24-rz/Orlith/main/install.ps1 | iex
 
 ## Quick Start (Manual Docker)
 
+> [!NOTE]
+> 🇮🇩 **Untuk pengguna berbahasa Indonesia**, silakan lihat [Panduan Instalasi Lengkap (Bahasa Indonesia)](PANDUAN_INSTALASI.md).
+
 1. Clone the repository and navigate into the root directory.
    ```bash
-   git clone https://github.com/yourusername/orlith.git
-   cd orlith
+   git clone https://github.com/alpha24-rz/Orlith.git
+   cd Orlith
    ```
 
 2. Copy the example `.env` file (if you have one) or create one at the project root:
