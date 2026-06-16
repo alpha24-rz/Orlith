@@ -41,7 +41,7 @@ if (Test-Path $InstallDir) {
 } else {
     Write-Host "Cloning ORLITH AI repository..." -ForegroundColor Yellow
     # Replace the URL below with the actual remote repository URL when ready
-    git clone https://github.com/yourusername/orlith.git $InstallDir
+    git clone https://github.com/alpha24-rz/documind-ai.git $InstallDir
     if (-not $?) {
         Write-Host "Error cloning repository." -ForegroundColor Red
         exit 1
