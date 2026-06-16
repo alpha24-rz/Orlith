@@ -35,12 +35,12 @@ You can install and run ORLITH AI on Linux, macOS, or Windows with a single comm
 
 **Linux and macOS:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/alpha24-rz/documind-ai/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/alpha24-rz/Orlith/main/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/alpha24-rz/documind-ai/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/alpha24-rz/Orlith/main/install.ps1 | iex
 ```
 
 ## Quick Start (Manual Docker)
