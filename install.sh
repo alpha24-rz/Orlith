@@ -35,7 +35,7 @@ if [ -d "$INSTALL_DIR" ]; then
 else
     echo "Cloning ORLITH AI repository..."
     # Replace the URL below with the actual remote repository URL when ready
-    git clone https://github.com/yourusername/orlith.git "$INSTALL_DIR"
+    git clone https://github.com/alpha24-rz/documind-ai.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 fi
 
