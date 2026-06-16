@@ -1,0 +1,24 @@
+# Development overrides — extends docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+version: '3.8'
+
+services:
+  backend:
+    # Mount source so uvicorn --reload picks up changes without rebuild
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+
+  frontend:
+    # Mount source so Next.js hot-reload works without rebuild
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules   # anonymous volume keeps container's node_modules
+      - /app/.next          # anonymous volume for build cache
+    command: ["npm", "run", "dev"]
+    environment:
+      - NODE_ENV=development
