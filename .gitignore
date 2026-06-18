@@ -53,4 +53,5 @@ Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
-*.sln*.sqlite3
+*.sln
+*.sqlite3

@@ -9,3 +9,4 @@ from .workspace import (
 from .document import DocumentBase, DocumentCreate, DocumentResponse
 from .api_key import APIKeyBase, APIKeyCreate, APIKeyResponse
 from .endpoint import EndpointBase, EndpointCreate, EndpointUpdate, EndpointResponse, ModelResponse
+from .workflow import WorkflowBase, WorkflowCreate, WorkflowUpdate, WorkflowResponse

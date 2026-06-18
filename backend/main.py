@@ -19,6 +19,7 @@ from api.routes import (
     conversations,
     workspace_credentials,
     notifications,
+    workflows,
 )
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -95,7 +96,7 @@ app.include_router(compare.router)
 app.include_router(conversations.router)
 app.include_router(workspace_credentials.router)
 app.include_router(notifications.router)
-
+app.include_router(workflows.router)
 
 
 @app.get("/")

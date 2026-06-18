@@ -15,3 +15,4 @@ from .credential import WorkspaceCredential
 from .chunk import Chunk, ChunkEmbedding
 from .workspace_member import WorkspaceMember
 from .notification import Notification
+from .workflow import Workflow, WorkflowRun
