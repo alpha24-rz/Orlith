@@ -297,10 +297,15 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
         )
 
         # Setup structural splitter
+        is_markdown = (
+            document.file_type == "text/markdown"
+            or document.file_path.lower().endswith((".md", ".markdown"))
+        )
         from services.chunking import StructuralTextSplitter
         splitter = StructuralTextSplitter(
             chunk_size=settings.CHUNK_SIZE,
             chunk_overlap=settings.CHUNK_OVERLAP,
+            is_markdown=is_markdown,
         )
 
         chunks = splitter.split_pages(pages_data)
