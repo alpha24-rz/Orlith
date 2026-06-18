@@ -82,50 +82,71 @@ class StandardChatMode(BaseReasoningMode):
                 retrieval_config=retrieval_config
             )
 
+            # Relevance Gate
+            top_score = 0.0
+            valid_chunks = []
+            for chunk in chunks:
+                score = 0.0
+                if "relevance_score" in chunk:
+                    score = chunk["relevance_score"]
+                elif "distance" in chunk:
+                    score = max(0.0, 1.0 - chunk["distance"])
+
+                if score > top_score:
+                    top_score = score
+                
+                # Threshold for relevance gate
+                if score >= 0.45:
+                    valid_chunks.append(chunk)
+
+            # Determine Source Mode
+            if top_score >= 0.70:
+                source_mode = "DOCUMENT"
+            elif top_score >= 0.45:
+                source_mode = "HYBRID"
+            else:
+                source_mode = "GENERAL"
+                valid_chunks = [] # Force general knowledge
+
             # 2. Build Citations
-            from services.ai.postprocess import generate_citations, format_sse_meta, format_sse_text
-            valid_chunks_text, citations = generate_citations(chunks)
+            from services.ai.postprocess import generate_citations, format_sse_meta, format_sse_text, format_llm_error_message
+            valid_chunks_text, citations = generate_citations(valid_chunks)
 
             # Yield citations metadata
             meta_data = {
                 "citations": citations,
                 "model": chat_model,
-                "confidence": 0.92,
+                "confidence": round(top_score, 2),
                 "queriesUsed": 1 if not enable_rewriting else 3,
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "source_mode": source_mode,
+                "retrieval_score": round(top_score, 4)
             }
             yield format_sse_meta(meta_data)
 
             context = (
                 "\n\n---\n\n".join(valid_chunks_text)
                 if valid_chunks_text
-                else "Tidak ada konteks relevan yang ditemukan dalam workspace."
+                else "Tidak ada dokumen relevan."
             )
 
-            # 3. Assemble System Prompt
-            if valid_chunks_text:
-                system_prompt = (
-                    "Kamu adalah DocuMind AI, asisten dokumen yang cerdas dan teliti. "
-                    "Jawab pertanyaan pengguna HANYA berdasarkan konteks dokumen yang disediakan.\n\n"
-                    "ATURAN CITATION (WAJIB DIIKUTI):\n"
-                    "1. Setiap kali kamu menggunakan informasi dari konteks, WAJIB tambahkan citation "
-                    "dalam format [N] tepat setelah kalimat yang menggunakan info tersebut.\n"
-                    "2. Jika satu kalimat menggunakan info dari beberapa sumber, gunakan [1][3] atau [1, 3].\n"
-                    "3. JANGAN gunakan informasi di luar konteks yang diberikan.\n"
-                    "4. Jika informasi tidak ada dalam konteks, katakan dengan jelas: "
-                    "\"Informasi ini tidak ditemukan dalam dokumen yang tersedia.\"\n\n"
-                    "Contoh format yang benar:\n"
-                    "\"Karyawan berhak atas 12 hari cuti tahunan [1]. "
-                    "Pengajuan cuti harus dilakukan minimal 3 hari sebelumnya [2].\"\n\n"
-                    f"KONTEKS DOKUMEN:\n{context}"
-                )
-            else:
-                system_prompt = (
-                    "Kamu adalah DocuMind AI, asisten dokumen yang cerdas. "
-                    "Tidak ada dokumen relevan yang ditemukan dalam workspace untuk menjawab pertanyaan ini. "
-                    "Informasikan hal ini kepada pengguna dan sarankan untuk mengunggah dokumen yang relevan "
-                    "atau mengubah pertanyaan dengan kata kunci yang berbeda."
-                )
+            # 3. Assemble Unified System Prompt
+            system_prompt = (
+                "Kamu adalah DocuMind AI, asisten AI untuk workspace dokumen.\n\n"
+                "ATURAN PRIORITAS (WAJIB DIIKUTI):\n"
+                "1. Jika tersedia KONTEKS DOKUMEN yang relevan, gunakan itu sebagai sumber utama jawaban.\n"
+                "2. Jika jawaban berasal dari dokumen, sertakan citation seperti [1] atau [2].\n"
+                "3. Jika dokumen tidak relevan (kosong) atau pertanyaan bersifat umum (sapaan, chit-chat, pengetahuan publik), jawab secara natural menggunakan pengetahuan umum.\n"
+                "4. Jika menjawab dari pengetahuan umum, tambahkan SATU disclaimer singkat di awal jawaban: \"Berdasarkan pengetahuan umum saya (karena tidak ditemukan informasi relevan di dokumen)...\"\n"
+                "5. Jangan mengarang isi dokumen. Jika dokumen tampak relevan tetapi tidak cukup untuk menjawab, katakan bahwa informasinya tidak ditemukan secara eksplisit.\n\n"
+                "ATURAN FORMATTING (WAJIB DIIKUTI):\n"
+                "1. Gunakan Markdown secara ekstensif agar jawaban mudah dibaca.\n"
+                "2. Jika data terstruktur (perbandingan, dll), gunakan Markdown Table.\n"
+                "3. Gunakan fenced code blocks untuk kode (```language ... ```), tetapi JANGAN bungkus seluruh jawaban dalam satu blok kode.\n"
+                "4. Gunakan bullet points atau daftar bernomor jika diperlukan.\n\n"
+                f"STATUS RETRIEVAL: {'DOCUMENT_AVAILABLE' if valid_chunks_text else 'DOCUMENT_NOT_RELEVANT'}\n"
+                f"KONTEKS DOKUMEN:\n{context}"
+            )
 
             # 4. Context Management (Memory Injection + History Compaction)
             context_manager = ContextManager(self.db)
@@ -155,7 +176,7 @@ class StandardChatMode(BaseReasoningMode):
                     yield format_sse_text(chunk)
 
             except Exception as e:
-                error_msg = f"\n\nError saat generasi: {str(e)}"
+                error_msg = format_llm_error_message(e)
                 accumulated_text += error_msg
                 yield format_sse_text(error_msg)
 
@@ -177,7 +198,6 @@ class StandardChatMode(BaseReasoningMode):
                 )
                 self.db.add(history)
                 
-                # Save assistant message
                 ai_msg = Message(
                     conversation_id=conversation_id,
                     role="assistant",
@@ -185,8 +205,12 @@ class StandardChatMode(BaseReasoningMode):
                     provider=endpoint_name,
                     model=chat_model,
                     citations=citations,
-                    confidence=0.92,
-                    metadata_json={"queriesUsed": meta_data.get("queriesUsed")}
+                    confidence=round(top_score, 2),
+                    metadata_json={
+                        "queriesUsed": meta_data.get("queriesUsed"),
+                        "source_mode": source_mode,
+                        "retrieval_score": round(top_score, 4)
+                    }
                 )
                 self.db.add(ai_msg)
                 
