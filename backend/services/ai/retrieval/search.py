@@ -263,10 +263,16 @@ async def semantic_search_docs(
     all_hits = []
     for chunk in chunks:
         meta = chunk["meta"]
-        distance = chunk["distance"]
         text = chunk["text"]
 
-        similarity = max(0.0, min(1.0, 1.0 - distance))
+        if "distance" in chunk:
+            similarity = max(0.0, min(1.0, 1.0 - chunk["distance"]))
+        elif "reranker_score" in chunk:
+            similarity = max(0.0, min(1.0, chunk["reranker_score"]))
+        elif "rrf_score" in chunk:
+            similarity = max(0.0, min(1.0, chunk["rrf_score"] * 30))
+        else:
+            similarity = 0.5
         doc_id = meta.get("document_id", "")
         doc_record = doc_map.get(doc_id)
         doc_type = (

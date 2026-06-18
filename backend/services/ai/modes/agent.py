@@ -1,15 +1,18 @@
 import json
 import logging
 import time
+import traceback
 from datetime import datetime, timezone
 from typing import AsyncIterator, List, Dict, Any, Optional
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Workspace, Document, AgentTrace, Conversation, Message
 from services.ai.base import BaseReasoningMode
 from services.ai.gateway import LLMGateway
 from services.ai.context.manager import ContextManager
 from services.ai.tools import get_default_registry
+from services.ai.postprocess.streaming import format_sse_event, format_llm_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +95,12 @@ class AgentMode(BaseReasoningMode):
             "3. Gunakan beberapa search queries berbeda untuk topik yang kompleks\n"
             "4. Sertakan citation [dokumen, halaman] di jawaban final\n"
             "5. Jika informasi tidak ditemukan setelah pencarian menyeluruh, katakan dengan jelas\n"
-            "6. Jawab dalam bahasa yang sama dengan pertanyaan pengguna"
+            "6. Jawab dalam bahasa yang sama dengan pertanyaan pengguna\n\n"
+            "ATURAN FORMATTING (WAJIB DIIKUTI):\n"
+            "1. Gunakan format Markdown secara ekstensif agar jawaban mudah dibaca.\n"
+            "2. JIKA pengguna meminta perbandingan, atau jika data mengandung struktur kolom/baris, WAJIB tampilkan jawaban dalam format Markdown Table.\n"
+            "3. JIKA memberikan contoh skrip, konfigurasi, atau data mentah, gunakan Markdown Code Blocks (```language ... ```).\n"
+            "4. Gunakan bullet points atau daftar bernomor jika menjelaskan langkah-langkah atau beberapa poin."
         )
 
         context_manager = ContextManager(self.db)
@@ -386,4 +394,4 @@ class AgentMode(BaseReasoningMode):
 
         except Exception as e:
             logger.error(f"ReAct fallback error: {e}")
-            return {"type": "final_answer", "content": f"Gagal memproses: {str(e)}"}
+            return {"type": "final_answer", "content": format_llm_error_message(e)}

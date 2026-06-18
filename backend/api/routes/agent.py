@@ -68,7 +68,7 @@ async def run_agent_endpoint(
             mode="agent",
             conversation_id=request.conversation_id,
             conversation_history=request.conversation_history or [],
-            override_provider=request.provider,
+            override_endpoint_id=request.provider,
             override_model=request.model,
             max_iterations=min(request.max_iterations or 8, 12),
         ),

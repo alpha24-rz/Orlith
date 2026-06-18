@@ -81,7 +81,7 @@ async def start_research(
             query=request.query,
             mode="research",
             conversation_history=[],
-            override_provider=request.provider,
+            override_endpoint_id=request.provider,
             override_model=request.model,
             job_id=job_id,
         ),
