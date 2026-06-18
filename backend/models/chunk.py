@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, ForeignKey
-from sqlalchemy.orm import mapped_column, relationship
+from sqlalchemy.orm import mapped_column, relationship, backref
 from pgvector.sqlalchemy import Vector
 from core.database import Base
 import uuid
@@ -19,7 +19,7 @@ class Chunk(Base):
     chunk_index = Column(Integer, nullable=False)
     token_count = Column(Integer, nullable=False, default=0)
     
-    document = relationship("Document", backref="chunks")
+    document = relationship("Document", backref=backref("chunks", cascade="all, delete-orphan", passive_deletes=True))
 
 class ChunkEmbedding(Base):
     __tablename__ = "chunk_embeddings"
@@ -35,4 +35,5 @@ class ChunkEmbedding(Base):
     # PgVector will support dynamic dimensions without strict length constraint this way
     embedding = mapped_column(Vector())
     
-    chunk = relationship("Chunk", backref="embeddings")
+    chunk = relationship("Chunk", backref=backref("embeddings", cascade="all, delete-orphan", passive_deletes=True))
+
