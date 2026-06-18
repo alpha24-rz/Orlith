@@ -89,8 +89,14 @@ class StandardChatMode(BaseReasoningMode):
                 score = 0.0
                 if "relevance_score" in chunk:
                     score = chunk["relevance_score"]
+                elif "rerank_score" in chunk:
+                    score = max(0.0, min(1.0, chunk["rerank_score"]))
+                elif "reranker_score" in chunk:
+                    score = max(0.0, min(1.0, chunk["reranker_score"]))
+                elif "rrf_score" in chunk:
+                    score = max(0.0, min(1.0, chunk["rrf_score"] * 30))
                 elif "distance" in chunk:
-                    score = max(0.0, 1.0 - chunk["distance"])
+                    score = max(0.0, min(1.0, 1.0 - chunk["distance"]))
 
                 if score > top_score:
                     top_score = score
