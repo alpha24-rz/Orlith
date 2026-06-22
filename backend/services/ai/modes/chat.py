@@ -83,6 +83,7 @@ class StandardChatMode(BaseReasoningMode):
             )
 
             # Relevance Gate
+            relevance_threshold = settings.RAG_SIMILARITY_THRESHOLD
             top_score = 0.0
             valid_chunks = []
             for chunk in chunks:
@@ -90,9 +91,11 @@ class StandardChatMode(BaseReasoningMode):
                 if "relevance_score" in chunk:
                     score = chunk["relevance_score"]
                 elif "rerank_score" in chunk:
-                    score = max(0.0, min(1.0, chunk["rerank_score"]))
+                    import math
+                    score = 1.0 / (1.0 + math.exp(-chunk["rerank_score"]))
                 elif "reranker_score" in chunk:
-                    score = max(0.0, min(1.0, chunk["reranker_score"]))
+                    import math
+                    score = 1.0 / (1.0 + math.exp(-chunk["reranker_score"]))
                 elif "rrf_score" in chunk:
                     score = max(0.0, min(1.0, chunk["rrf_score"] * 30))
                 elif "distance" in chunk:
@@ -102,13 +105,13 @@ class StandardChatMode(BaseReasoningMode):
                     top_score = score
                 
                 # Threshold for relevance gate
-                if score >= 0.45:
+                if score >= relevance_threshold:
                     valid_chunks.append(chunk)
 
             # Determine Source Mode
             if top_score >= 0.70:
                 source_mode = "DOCUMENT"
-            elif top_score >= 0.45:
+            elif top_score >= relevance_threshold:
                 source_mode = "HYBRID"
             else:
                 source_mode = "GENERAL"

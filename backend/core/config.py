@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 128
     RAG_CANDIDATE_POOL_SIZE: int = 30
     RAG_FINAL_TOP_K: int = 5
-    RAG_SIMILARITY_THRESHOLD: float = 0.3
+    RAG_SIMILARITY_THRESHOLD: float = 0.5
     
     # Reranker Settings
     ENABLE_RERANKER: bool = True
