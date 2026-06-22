@@ -266,9 +266,11 @@ async def semantic_search_docs(
         text = chunk["text"]
 
         if "rerank_score" in chunk:
-            similarity = max(0.0, min(1.0, chunk["rerank_score"]))
+            import math
+            similarity = 1.0 / (1.0 + math.exp(-chunk["rerank_score"]))
         elif "reranker_score" in chunk:
-            similarity = max(0.0, min(1.0, chunk["reranker_score"]))
+            import math
+            similarity = 1.0 / (1.0 + math.exp(-chunk["reranker_score"]))
         elif "rrf_score" in chunk:
             similarity = max(0.0, min(1.0, chunk["rrf_score"] * 30))
         elif "distance" in chunk:

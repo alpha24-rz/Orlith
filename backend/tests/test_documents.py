@@ -75,6 +75,11 @@ async def test_document_lifecycle(client: AsyncClient):
     assert len(documents_list) >= 1
     assert any(d["id"] == doc_id for d in documents_list)
 
+    # 4.5. Download Document
+    down_resp = await client.get(f"/documents/{doc_id}/download", headers=headers)
+    assert down_resp.status_code == 200
+    assert down_resp.content == file_content
+
     # 5. Delete Document
     del_resp = await client.delete(f"/documents/{doc_id}", headers=headers)
     assert del_resp.status_code == 200

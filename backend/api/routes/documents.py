@@ -9,6 +9,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db
@@ -150,6 +151,25 @@ async def delete_document(document_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"message": "Document deleted successfully"}
+
+
+@router.get("/{document_id}/download")
+async def download_document(document_id: str, db: AsyncSession = Depends(get_db)):
+    document = await db.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="Physical file not found")
+
+    media_type = "application/pdf" if document.file_type.upper() == "PDF" else "application/octet-stream"
+    
+    return FileResponse(
+        path=document.file_path,
+        media_type=media_type,
+        filename=document.filename,
+        content_disposition_type="inline"
+    )
 
 
 @router.websocket("/ws/{workspace_id}")

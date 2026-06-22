@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+:root {
+  --background: #F9FAFB;
+  --foreground: #111827;
+
+  --bg-sidebar: #FFFFFF;
+  --bg-panel: #FFFFFF;
+  --bg-hover: #F3F4F6;
+  --bg-input: #FFFFFF;
+
+  --border-subtle: #E5E7EB;
+  --border-strong: #D1D5DB;
+
+  --text-muted: #6B7280;
+  --text-subtle: #4B5563;
+
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+}
+
+.dark {
+  /* User requested palette */
+  --onyx: #0b0b0d;
+  --onyx-2: #151517;
+  --carbon-black: #1b1b1d;
+  --shadow-grey: #212124;
+  --shadow-grey-2: #262629;
+  --graphite: #2b2b2e;
+
+  --background: var(--onyx);
+  --foreground: #FFFFFF;
+
+  --bg-sidebar: var(--onyx-2);
+  --bg-panel: var(--onyx-2);
+  --bg-input: var(--carbon-black);
+  --bg-hover: var(--shadow-grey);
+
+  --border-subtle: var(--shadow-grey-2);
+  --border-strong: var(--graphite);
+
+  --text-muted: #6b7280;
+  /* neutral gray */
+  --text-subtle: #9ca3af;
+  /* neutral gray */
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.25);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-hover: var(--bg-hover);
+  --color-bg-input: var(--bg-input);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Custom Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* React Flow Overrides */
+.react-flow__controls-button {
+  background-color: var(--bg-panel) !important;
+  border-color: var(--border-subtle) !important;
+  fill: var(--foreground) !important;
+  color: var(--foreground) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--bg-hover) !important;
+}
