@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Link from 'next/link'
 import { formatBytes, formatRelativeTime } from '@/lib/utils'
@@ -10,9 +10,10 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import {
   FileText, Upload, Search, Filter, MoreVertical,
   CheckCircle2, Clock, XCircle, Trash2, Download,
-  MessageSquare, Tag, ChevronDown, File, AlertCircle,
-  X, FileSpreadsheet, RefreshCw, Zap
+  MessageSquare, Tag, ChevronDown, AlertCircle,
+  X, FileSpreadsheet, RefreshCw, Zap, Settings
 } from 'lucide-react'
+import GoogleDriveSettingsModal from '@/components/GoogleDriveSettingsModal'
 
 interface Toast {
   id: string
@@ -48,6 +49,39 @@ const getWebSocketUrl = (workspaceId: string) => {
   return `${wsBase}/documents/ws/${workspaceId}`
 }
 
+async function fetchFilesInFolder(folderId: string, accessToken: string): Promise<any[]> {
+  let allFiles: any[] = []
+  let nextPageToken: string | undefined = undefined
+  
+  do {
+    const q: string = `'${folderId}' in parents and trashed = false`
+    const requestUrl: string = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`
+    const response: Response = await fetch(requestUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to list files in folder: ${response.statusText}`)
+    }
+    const data: any = await response.json()
+    const files = data.files || []
+    
+    for (const file of files) {
+      if (file.mimeType === 'application/vnd.google-apps.folder') {
+        const subFiles = await fetchFilesInFolder(file.id, accessToken)
+        allFiles = allFiles.concat(subFiles)
+      } else {
+        allFiles.push(file)
+      }
+    }
+    
+    nextPageToken = data.nextPageToken
+  } while (nextPageToken)
+
+  return allFiles
+}
+
 export default function DocumentsPage() {
   const { activeWorkspace } = useWorkspaceStore()
   const [docs, setDocs] = useState<Document[]>([])
@@ -57,18 +91,323 @@ export default function DocumentsPage() {
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatusText, setUploadStatusText] = useState('')
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
   const [useOcr, setUseOcr] = useState(false)
   
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [isDriveSettingsOpen, setIsDriveSettingsOpen] = useState(false)
+  const [isGapiLoaded, setIsGapiLoaded] = useState(false)
 
-  const addToast = (title: string, desc: string, type: 'success' | 'info' | 'danger' = 'success') => {
+  const addToast = useCallback((title: string, desc: string, type: 'success' | 'info' | 'danger' = 'success') => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 9)
     setToasts(prev => [...prev, { id, title, desc, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, 3500)
+  }, [])
+
+  const loadGoogleSDKs = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const anyWin = window as any
+      if (anyWin.gapi && anyWin.google?.accounts?.oauth2) {
+        resolve()
+        return
+      }
+
+      let gapiLoaded = false
+      let gisLoaded = false
+
+      const checkLoaded = () => {
+        if (gapiLoaded && gisLoaded) {
+          setIsGapiLoaded(true)
+          resolve()
+        }
+      }
+
+      // Load gapi
+      if (!anyWin.gapi) {
+        const scriptGapi = document.createElement('script')
+        scriptGapi.src = 'https://apis.google.com/js/api.js'
+        scriptGapi.async = true
+        scriptGapi.defer = true
+        scriptGapi.onload = () => {
+          gapiLoaded = true
+          checkLoaded()
+        }
+        scriptGapi.onerror = () => reject(new Error('Gagal memuat Google API script'))
+        document.body.appendChild(scriptGapi)
+      } else {
+        gapiLoaded = true
+      }
+
+      // Load gis
+      if (!anyWin.google?.accounts?.oauth2) {
+        const scriptGis = document.createElement('script')
+        scriptGis.src = 'https://accounts.google.com/gsi/client'
+        scriptGis.async = true
+        scriptGis.defer = true
+        scriptGis.onload = () => {
+          gisLoaded = true
+          checkLoaded()
+        }
+        scriptGis.onerror = () => reject(new Error('Gagal memuat Google Identity Services script'))
+        document.body.appendChild(scriptGis)
+      } else {
+        gisLoaded = true
+      }
+
+      checkLoaded()
+    })
+  }
+
+  const handleGoogleDriveClick = async () => {
+    if (!activeWorkspace?.id) {
+      addToast("Upload Blocked", "Silakan pilih workspace terlebih dahulu.", "danger")
+      return
+    }
+
+    const clientId = localStorage.getItem('google_client_id')
+    const apiKey = localStorage.getItem('google_api_key')
+
+    if (!clientId || !apiKey) {
+      setIsDriveSettingsOpen(true)
+      return
+    }
+
+    const savedToken = localStorage.getItem('google_access_token')
+    const expiry = localStorage.getItem('google_token_expiry')
+
+    if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+      setUploading(true)
+      setUploadProgress(5)
+      try {
+        await loadGoogleSDKs()
+        openPicker(savedToken, apiKey)
+      } catch (err: any) {
+        console.error(err)
+        setUploading(false)
+        addToast("Google Drive", err.message || "Gagal memuat SDK Google.", "danger")
+      }
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(5)
+    addToast("Google Drive", "Menghubungkan ke Google Drive...", "info")
+
+    try {
+      await loadGoogleSDKs()
+      const anyWin = window as any
+      
+      const tokenClient = anyWin.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive.readonly',
+        callback: async (response: any) => {
+          if (response.error !== undefined) {
+            setUploading(false)
+            console.error(response)
+            addToast("Google Drive", "Autentikasi gagal.", "danger")
+            return
+          }
+          
+          if (response.access_token) {
+            localStorage.setItem('google_access_token', response.access_token)
+            localStorage.setItem('google_token_expiry', (Date.now() + (response.expires_in || 3600) * 1000).toString())
+          }
+          
+          openPicker(response.access_token, apiKey)
+        },
+      })
+      tokenClient.requestAccessToken({ prompt: '' })
+    } catch (err: any) {
+      console.error(err)
+      setUploading(false)
+      addToast("Google Drive", err.message || "Gagal menghubungkan.", "danger")
+    }
+  }
+
+  const openPicker = (accessToken: string, apiKey: string) => {
+    const anyWin = window as any
+    anyWin.gapi.load('picker', () => {
+      const view = new anyWin.google.picker.DocsView(anyWin.google.picker.ViewId.DOCS)
+      view.setMimeTypes('application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,application/vnd.google-apps.document,application/vnd.google-apps.spreadsheet,application/vnd.google-apps.presentation')
+      view.setIncludeFolders(true)
+      view.setSelectFolderEnabled(true)
+      
+      const picker = new anyWin.google.picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(accessToken)
+        .setDeveloperKey(apiKey)
+        .enableFeature(anyWin.google.picker.Feature.MULTISELECT_ENABLED)
+        .setCallback(async (data: any) => {
+          if (data.action === anyWin.google.picker.Action.PICKED) {
+            const files = data.docs.map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              mimeType: d.mimeType
+            }))
+            handleGoogleDriveFilesSelected(files, accessToken)
+          } else if (data.action === anyWin.google.picker.Action.CANCEL) {
+            setUploading(false)
+          }
+        })
+        .build()
+      picker.setVisible(true)
+    })
+  }
+
+  const handleGoogleDriveFilesSelected = async (selectedItems: { id: string; name: string; mimeType: string }[], accessToken: string) => {
+    if (selectedItems.length === 0) return
+    setUploading(true)
+    setUploadStatusText("Membaca file & folder...")
+    setUploadProgress(5)
+
+    let files: { id: string; name: string; mimeType: string }[] = []
+
+    try {
+      for (const item of selectedItems) {
+        if (item.mimeType === 'application/vnd.google-apps.folder') {
+          addToast("Google Drive", `Menelusuri folder: ${item.name}...`, "info")
+          const folderFiles = await fetchFilesInFolder(item.id, accessToken)
+          files = files.concat(folderFiles)
+        } else {
+          files.push(item)
+        }
+      }
+    } catch (err: any) {
+      console.error(err)
+      addToast("Failed", `Gagal membaca folder Google Drive: ${err.message || "Unknown error"}`, "danger")
+      setUploading(false)
+      setUploadStatusText('')
+      return
+    }
+
+    const isSupportedFile = (name: string, mimeType: string) => {
+      const lowerName = name.toLowerCase()
+      const isExtensionSupported = ['.pdf', '.docx', '.xlsx', '.txt', '.md'].some(ext => lowerName.endsWith(ext))
+      const isMimeSupported = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/markdown',
+        'application/vnd.google-apps.document',
+        'application/vnd.google-apps.spreadsheet',
+        'application/vnd.google-apps.presentation'
+      ].includes(mimeType)
+      return isExtensionSupported || isMimeSupported
+    }
+
+    const filteredFiles = files.filter(f => isSupportedFile(f.name, f.mimeType))
+
+    if (filteredFiles.length === 0) {
+      addToast("Info", "Tidak ada file yang didukung ditemukan di dalam pilihan/folder tersebut.", "info")
+      setUploading(false)
+      setUploadStatusText('')
+      return
+    }
+
+    let successCount = 0
+    let failCount = 0
+
+    const GOOGLE_EXPORT_FORMATS: Record<string, { mimeType: string, extension: string }> = {
+      'application/vnd.google-apps.document': {
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        extension: '.docx'
+      },
+      'application/vnd.google-apps.spreadsheet': {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        extension: '.xlsx'
+      },
+      'application/vnd.google-apps.presentation': {
+        mimeType: 'application/pdf',
+        extension: '.pdf'
+      }
+    }
+
+    for (let i = 0; i < filteredFiles.length; i++) {
+      const gfile = filteredFiles[i]
+      const fileIndexText = filteredFiles.length > 1 ? `(${i + 1}/${filteredFiles.length})` : ''
+      setUploadStatusText(`Downloading ${fileIndexText}: ${gfile.name}...`)
+      
+      const baseProgress = (i / filteredFiles.length) * 100
+      setUploadProgress(Math.round(baseProgress + (10 / filteredFiles.length)))
+
+      if (filteredFiles.length === 1) {
+        addToast("Google Drive", `Downloading ${gfile.name}...`, "info")
+      }
+
+      try {
+        let blob: Blob
+        let finalFileName = gfile.name
+
+        setUploadProgress(Math.round(baseProgress + (30 / filteredFiles.length)))
+        if (GOOGLE_EXPORT_FORMATS[gfile.mimeType]) {
+          const exportFormat = GOOGLE_EXPORT_FORMATS[gfile.mimeType]
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${gfile.id}/export?mimeType=${exportFormat.mimeType}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          })
+
+          if (!res.ok) {
+            throw new Error(`Export failed: ${res.statusText}`)
+          }
+          blob = await res.blob()
+          if (!finalFileName.toLowerCase().endsWith(exportFormat.extension)) {
+            finalFileName += exportFormat.extension
+          }
+        } else {
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${gfile.id}?alt=media`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          })
+
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.statusText}`)
+          }
+          blob = await res.blob()
+        }
+
+        setUploadProgress(Math.round(baseProgress + (60 / filteredFiles.length)))
+        const file = new File([blob], finalFileName, { type: blob.type })
+
+        setUploadStatusText(`Uploading ${fileIndexText}: ${finalFileName}...`)
+        const newDoc = await api.uploadDocument(activeWorkspace!.id, file, useOcr)
+
+        setDocs(prev => {
+          const exists = prev.some(d => d.id === newDoc.id)
+          if (exists) {
+            return prev.map(d => d.id === newDoc.id ? newDoc : d)
+          }
+          return [newDoc, ...prev]
+        })
+        successCount++
+        setUploadProgress(Math.round(((i + 1) / filteredFiles.length) * 100))
+      } catch (err: any) {
+        failCount++
+        console.error(err)
+        addToast("Failed", `Failed to import ${gfile.name}: ${err.message || "Unknown error"}`, "danger")
+      }
+    }
+
+    if (filteredFiles.length > 1) {
+      if (successCount === filteredFiles.length) {
+        addToast("Success", `All ${successCount} files imported from Google Drive.`, "success")
+      } else if (successCount > 0) {
+        addToast("Import Finished", `Imported ${successCount} files, ${failCount} failed.`, "info")
+      } else {
+        addToast("Import Failed", `Failed to import all files from Google Drive.`, "danger")
+      }
+    } else if (successCount === 1) {
+      addToast("Sukses", "Dokumen berhasil diunggah dari Google Drive.", "success")
+    }
+
+    setUploading(false)
+    setUploadStatusText('')
   }
 
   // Fetch initial documents & manage updates via Websocket/Polling
@@ -279,7 +618,9 @@ export default function DocumentsPage() {
                 <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
                   <Upload className="w-5 h-5 text-indigo-400 animate-bounce" />
                 </div>
-                <div className="text-sm font-semibold">Uploading & processing…</div>
+                <div className="text-sm font-semibold truncate w-full px-2" title={uploadStatusText || "Uploading & processing…"}>
+                  {uploadStatusText || "Uploading & processing…"}
+                </div>
                 <div className="w-full h-1.5 bg-bg-hover rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-200"
@@ -301,6 +642,36 @@ export default function DocumentsPage() {
                   {['PDF', 'DOCX', 'TXT', 'MD'].map(t => (
                     <span key={t} className="px-2 py-0.5 rounded-full bg-bg-hover border border-border-strong text-[10px] text-text-muted">{t}</span>
                   ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2 items-center justify-center mt-4">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleGoogleDriveClick()
+                    }}
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-bg-panel border border-border-strong hover:border-indigo-500/40 hover:bg-indigo-600/5 text-xs text-indigo-400 font-semibold transition-all cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19.43 12.98l-7.43-12.98h-4l7.43 12.98z" fill="#FFC107" />
+                      <path d="M15.43 20h-10.86l-3.43-6 5.43-9.43z" fill="#2196F3" />
+                      <path d="M22 13h-10.86l-3.43 6h10.86z" fill="#4CAF50" />
+                    </svg>
+                    <span>Connect Google Drive</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsDriveSettingsOpen(true)
+                    }}
+                    title="Google Drive Settings"
+                    className="p-2 rounded-xl bg-bg-panel border border-border-strong hover:border-indigo-500/40 hover:bg-indigo-600/5 text-text-muted hover:text-indigo-400 transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </>
             )}
@@ -635,6 +1006,12 @@ export default function DocumentsPage() {
           </div>
         ))}
       </div>
+
+      <GoogleDriveSettingsModal
+        isOpen={isDriveSettingsOpen}
+        onClose={() => setIsDriveSettingsOpen(false)}
+        onSave={() => addToast("Pengaturan Disimpan", "Kredensial Google Drive berhasil disimpan.", "success")}
+      />
     </div>
   )
 }
