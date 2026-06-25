@@ -38,13 +38,17 @@ frontend-dev: ## Run Next.js frontend with hot-reload (local, no Docker)
 
 dev-docker: ## Run both services with Docker Compose + hot-reload (dev overrides)
 	@$(MAKE) env-check
-	@$(COMPOSE_DEV) up --build
+	@$(MAKE) build
+	@$(COMPOSE_DEV) up
 
 # ─── Build ────────────────────────────────────────────────────────────────────
-build: ## Build production Docker images for both services
+build: ## Build production Docker images for both services using host network
 	@$(MAKE) env-check
-	@echo "→ Building production Docker images..."
-	@$(COMPOSE) build --no-cache
+	@echo "→ Building production Docker images using host network..."
+	@echo "→ Building backend image..."
+	docker build --network=host -t documind-ai-backend:latest ./backend
+	@echo "→ Building frontend image..."
+	docker build --network=host --build-arg NEXT_PUBLIC_API_URL=$$(grep NEXT_PUBLIC_API_URL .env | cut -d '=' -f2- || echo "") -t documind-ai-frontend:latest ./frontend
 	@echo "✓ Build complete."
 
 # ─── Production ───────────────────────────────────────────────────────────────

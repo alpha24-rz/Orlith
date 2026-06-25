@@ -48,6 +48,20 @@ from core.rate_limit import limiter
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    if settings.ENVIRONMENT == "production":
+        insecure_keys = [
+            "replace-this-with-a-very-long-secret-key-min-32-chars",
+            "replace-this-with-a-very-long-secret-key-min-32-chars-or-longer",
+        ]
+        if settings.SECRET_KEY in insecure_keys or len(settings.SECRET_KEY) < 32:
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: SECRET_KEY is set to a default value "
+                "or is less than 32 characters long in production mode! "
+                "Please generate a secure random hex key using: "
+                "python -c 'import secrets; print(secrets.token_hex(32))' "
+                "and update your environment variables."
+            )
+            
     await init_db()
     yield
     # Shutdown
@@ -72,8 +86,15 @@ app.add_middleware(SlowAPIMiddleware)
 cors_origins = (
     settings.CORS_ORIGINS.split(",")
     if settings.CORS_ORIGINS and settings.CORS_ORIGINS != "*"
-    else ["*"]
+    else []
 )
+if not cors_origins or "*" in cors_origins:
+    cors_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

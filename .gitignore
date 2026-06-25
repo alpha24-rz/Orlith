@@ -55,3 +55,11 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sqlite3
+
+# Temporary local files and helper logs
+local.html
+tunnel.html
+*.log
+
+# Cloned Hugging Face Space repositories
+orlith-ai/

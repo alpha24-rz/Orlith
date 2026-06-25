@@ -43,7 +43,10 @@ const Prism: React.FC<PrismProps> = ({
         const container = containerRef.current;
         if (!container) return;
 
-        const H = Math.max(0.001, height);
+        let cleanup = () => {};
+
+        try {
+            const H = Math.max(0.001, height);
         const BW = Math.max(0.001, baseWidth);
         const BASE_HALF = BW * 0.5;
         const GLOW = Math.max(0.0, glow);
@@ -176,7 +179,7 @@ const Prism: React.FC<PrismProps> = ({
           wob = mat2(c0, c1, c2, c0);
         }
 
-        const int STEPS = 100;
+        const int STEPS = 35;
         for (int i = 0; i < STEPS; i++) {
           p = vec3(f, z);
           p.xz = p.xz * wob;
@@ -418,20 +421,27 @@ const Prism: React.FC<PrismProps> = ({
             startRAF();
         }
 
+            cleanup = () => {
+                stopRAF();
+                ro.disconnect();
+                if (animationType === 'hover') {
+                    if (onPointerMove) window.removeEventListener('pointermove', onPointerMove as EventListener);
+                    window.removeEventListener('mouseleave', onLeave);
+                    window.removeEventListener('blur', onBlur);
+                }
+                if (suspendWhenOffscreen) {
+                    const io = (container as PrismContainer).__prismIO as IntersectionObserver | undefined;
+                    if (io) io.disconnect();
+                    delete (container as PrismContainer).__prismIO;
+                }
+                if (gl.canvas.parentElement === container) container.removeChild(gl.canvas);
+            };
+        } catch (error) {
+            console.warn("WebGL Prism initialization failed, falling back to CSS. Error:", error);
+        }
+
         return () => {
-            stopRAF();
-            ro.disconnect();
-            if (animationType === 'hover') {
-                if (onPointerMove) window.removeEventListener('pointermove', onPointerMove as EventListener);
-                window.removeEventListener('mouseleave', onLeave);
-                window.removeEventListener('blur', onBlur);
-            }
-            if (suspendWhenOffscreen) {
-                const io = (container as PrismContainer).__prismIO as IntersectionObserver | undefined;
-                if (io) io.disconnect();
-                delete (container as PrismContainer).__prismIO;
-            }
-            if (gl.canvas.parentElement === container) container.removeChild(gl.canvas);
+            cleanup();
         };
     }, [
         height,

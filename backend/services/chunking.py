@@ -287,3 +287,189 @@ class StructuralTextSplitter:
         if len(words) <= overlap_word_count:
             return text
         return ' '.join(words[-overlap_word_count:]) + "\n\n"
+
+
+def cosine_similarity(v1: list[float], v2: list[float]) -> float:
+    dot = sum(a * b for a, b in zip(v1, v2))
+    norm1 = sum(a * a for a in v1) ** 0.5
+    norm2 = sum(b * b for b in v2) ** 0.5
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
+def split_sentences(text: str) -> list[str]:
+    sentence_end = re.compile(
+        r'(?<!\beg\.)(?<!\bie\.)(?<!\bdr\.)(?<!\bmr\.)(?<!\bms\.)(?<!\bvs\.)(?<!\bal\.)'
+        r'(?<!\bmrs\.)(?<!\bcol\.)(?<!\bgen\.)(?<!\betc\.)'
+        r'(?<!\bprof\.)'
+        r'(?<!\b[A-Z]\.)'
+        r'(?<=\.|\?|\!)\s+',
+        re.IGNORECASE
+    )
+    raw_sentences = sentence_end.split(text)
+    return [s.strip() for s in raw_sentences if s.strip()]
+
+
+class SemanticSimilaritySplitter:
+    def __init__(self, chunk_size: int = 1024, chunk_overlap: int = 128):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.structural_helper = StructuralTextSplitter(chunk_size, chunk_overlap)
+
+    def _is_heading(self, text: str) -> bool:
+        return self.structural_helper._is_heading(text)
+
+    async def split_pages_semantic(
+        self, pages: list[dict], embedding_provider, model_name: str
+    ) -> list[dict]:
+        """
+        Splits pages semantically by embedding sliding windows of sentences and
+        detecting drops in cosine similarity.
+        """
+        sentences_with_metadata = []
+        for page in pages:
+            page_text = page.get("text", "")
+            page_num = page.get("page_number", 1)
+            page_text_clean = clean_pdf_text(page_text)
+            
+            page_sentences = split_sentences(page_text_clean)
+            for s in page_sentences:
+                sentences_with_metadata.append({
+                    "text": s,
+                    "page_number": page_num
+                })
+                
+        if not sentences_with_metadata:
+            return []
+
+        # Form sliding window groups for semantic context
+        groups = []
+        for i in range(len(sentences_with_metadata)):
+            start = max(0, i - 1)
+            end = min(len(sentences_with_metadata), i + 2)
+            group_text = " ".join([sentences_with_metadata[idx]["text"] for idx in range(start, end)])
+            groups.append(group_text)
+
+        # Embed groups in batches to avoid payload limits
+        embeddings = []
+        batch_size = 128
+        try:
+            for j in range(0, len(groups), batch_size):
+                batch = groups[j : j + batch_size]
+                batch_embs = await embedding_provider.embed(batch, model_name)
+                embeddings.extend(batch_embs)
+        except Exception as embed_err:
+            logger.warning(f"Embedding failed during semantic chunking: {embed_err}. Falling back to structural chunking.")
+            return self.structural_helper.split_pages(pages)
+
+        if len(embeddings) < 2:
+            chunk_text = " ".join([s["text"] for s in sentences_with_metadata])
+            return [{
+                "text": chunk_text,
+                "page_number": sentences_with_metadata[0]["page_number"],
+                "section": None,
+                "chunk_index": 0,
+                "token_count": int(len(chunk_text.split()) * 1.3)
+            }]
+
+        similarities = []
+        for k in range(len(embeddings) - 1):
+            sim = cosine_similarity(embeddings[k], embeddings[k + 1])
+            similarities.append(sim)
+
+        distances = [1.0 - s for s in similarities]
+
+        mean_dist = sum(distances) / len(distances)
+        variance = sum((d - mean_dist) ** 2 for d in distances) / len(distances)
+        std_dist = variance ** 0.5
+        threshold = mean_dist + 0.8 * std_dist
+
+        semantic_chunk_groups = []
+        current_group = [sentences_with_metadata[0]]
+        for i in range(len(distances)):
+            if distances[i] > threshold:
+                semantic_chunk_groups.append(current_group)
+                current_group = []
+            current_group.append(sentences_with_metadata[i + 1])
+        if current_group:
+            semantic_chunk_groups.append(current_group)
+
+        # Merge consecutive small semantic chunks
+        merged_groups = []
+        current_group = []
+        current_tokens = 0
+
+        for group in semantic_chunk_groups:
+            group_text = " ".join([s["text"] for s in group])
+            group_tokens = int(len(group_text.split()) * 1.3)
+
+            if current_tokens + group_tokens <= self.chunk_size or not current_group:
+                current_group.extend(group)
+                current_tokens += group_tokens
+            else:
+                merged_groups.append(current_group)
+                
+                overlap_sentences = []
+                overlap_tokens = 0
+                max_overlap_tokens = self.chunk_overlap
+                for s in reversed(current_group):
+                    s_tokens = int(len(s["text"].split()) * 1.3)
+                    if overlap_tokens + s_tokens <= max_overlap_tokens:
+                        overlap_sentences.insert(0, s)
+                        overlap_tokens += s_tokens
+                    else:
+                        break
+                current_group = overlap_sentences + group
+                current_tokens = overlap_tokens + group_tokens
+
+        if current_group:
+            merged_groups.append(current_group)
+
+        chunks = []
+        chunk_idx = 0
+
+        for raw_group in merged_groups:
+            chunk_text = " ".join([s["text"] for s in raw_group])
+            start_page = raw_group[0]["page_number"]
+
+            chunk_section = None
+            for s in raw_group:
+                if self._is_heading(s["text"]):
+                    chunk_section = s["text"][:200]
+                    break
+
+            chunk_tokens = int(len(chunk_text.split()) * 1.3)
+
+            if chunk_tokens > self.chunk_size:
+                from langchain_text_splitters import RecursiveCharacterTextSplitter
+                char_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=self.chunk_size * 4,
+                    chunk_overlap=self.chunk_overlap * 4,
+                )
+                sub_texts = char_splitter.split_text(chunk_text)
+                for sub_t in sub_texts:
+                    sub_tokens = int(len(sub_t.split()) * 1.3)
+                    chunks.append({
+                        "text": sub_t,
+                        "page_number": start_page,
+                        "section": chunk_section,
+                        "chunk_index": chunk_idx,
+                        "token_count": sub_tokens
+                    })
+                    chunk_idx += 1
+            else:
+                chunks.append({
+                    "text": chunk_text,
+                    "page_number": start_page,
+                    "section": chunk_section,
+                    "chunk_index": chunk_idx,
+                    "token_count": chunk_tokens
+                })
+                chunk_idx += 1
+
+        logger.info(
+            f"Semantic Chunking complete: {len(chunks)} chunks, "
+            f"avg tokens={sum(c['token_count'] for c in chunks) / max(len(chunks), 1):.0f}"
+        )
+        return chunks

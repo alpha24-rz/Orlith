@@ -1,9 +1,3 @@
-"""
-Research Routes — DocuMind AI
-================================
-Endpoints untuk menjalankan Deep Research dan mengakses hasil laporan.
-"""
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -14,6 +8,8 @@ import json
 
 from core.database import get_db
 from models import ResearchJob
+from models.user import User
+from api.deps import get_current_user, get_workspace_member
 from services.ai import AIOrchestrator
 
 router = APIRouter(prefix="/research", tags=["Deep Research"])
@@ -42,25 +38,12 @@ class ResearchJobResponse(BaseModel):
 async def start_research(
     request: StartResearchRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Mulai sesi Deep Research baru.
-
-    Membuat ResearchJob di database, lalu langsung memulai pipeline
-    dan streaming progress via SSE.
-
-    SSE Events:
-      - {event: "plan_start"}
-      - {event: "plan", sub_questions: [...], count: N}
-      - {event: "searching", question: "...", index: N, total: M}
-      - {event: "found", question: "...", chunks_found: K}
-      - {event: "synthesizing", question: "...", index: N}
-      - {event: "synthesized", question: "...", summary_length: N}
-      - {event: "iterating", reason: "...", weak_questions: [...]}
-      - {event: "writing_report", total_chunks: N}
-      - {event: "done", job_id: "...", report_length: N}
-      - {event: "error", message: "..."}
     """
+    await get_workspace_member(request.workspace_id, current_user, db)
     # Buat ResearchJob dulu
     job = ResearchJob(
         workspace_id=request.workspace_id,
@@ -77,7 +60,7 @@ async def start_research(
     return StreamingResponse(
         orchestrator.route_query(
             workspace_id=request.workspace_id,
-            user_id=None,
+            user_id=current_user.id,
             query=request.query,
             mode="research",
             conversation_history=[],
@@ -98,11 +81,12 @@ async def list_research_jobs(
     workspace_id: str,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Ambil daftar semua research jobs milik workspace.
-    Untuk Research Job Queue UI.
     """
+    await get_workspace_member(workspace_id, current_user, db)
     result = await db.execute(
         select(ResearchJob)
         .where(ResearchJob.workspace_id == workspace_id)
@@ -136,10 +120,12 @@ async def get_research_job(
     workspace_id: str,
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Ambil detail lengkap satu research job, termasuk laporan Markdown.
     """
+    await get_workspace_member(workspace_id, current_user, db)
     job = await db.get(ResearchJob, job_id)
     if not job or job.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Research job tidak ditemukan.")
@@ -178,8 +164,10 @@ async def delete_research_job(
     workspace_id: str,
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Hapus satu research job beserta laporannya."""
+    await get_workspace_member(workspace_id, current_user, db)
     job = await db.get(ResearchJob, job_id)
     if not job or job.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Research job tidak ditemukan.")
@@ -187,3 +175,4 @@ async def delete_research_job(
     await db.delete(job)
     await db.commit()
     return {"success": True, "deleted_id": job_id}
+

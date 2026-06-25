@@ -56,21 +56,49 @@ def extract_text_from_file(
         or file_type
         == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ):
-        doc = docx.Document(file_path)
-        text_parts = []
-        for paragraph in doc.paragraphs:
-            if paragraph.text:
-                text_parts.append(paragraph.text)
+        try:
+            doc = docx.Document(file_path)
+            text_parts = []
+            for paragraph in doc.paragraphs:
+                if paragraph.text:
+                    text_parts.append(paragraph.text)
 
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    if cell.text:
-                        text_parts.append(cell.text)
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text:
+                            text_parts.append(cell.text)
 
-        text_content = "\n".join(text_parts)
-        pages_data.append({"text": text_content, "page_number": 1})
-        metadata["page_count"] = len(doc.paragraphs)
+            text_content = "\n".join(text_parts)
+            pages_data.append({"text": text_content, "page_number": 1})
+            metadata["page_count"] = len(doc.paragraphs)
+        except Exception as docx_err:
+            logger.warning(f"python-docx parsing failed: {docx_err}. Attempting raw XML zip fallback...")
+            try:
+                import zipfile
+                import xml.etree.ElementTree as ET
+                
+                with zipfile.ZipFile(file_path) as docx_zip:
+                    xml_content = docx_zip.read('word/document.xml')
+                
+                root = ET.fromstring(xml_content)
+                text_parts = []
+                for elem in root.iter():
+                    if elem.tag.endswith('}t') and elem.text:
+                        text_parts.append(elem.text)
+                
+                text_content = " ".join(text_parts)
+                if not text_content.strip():
+                    raise ValueError("No text extracted from word/document.xml")
+                
+                pages_data.append({"text": text_content, "page_number": 1})
+                metadata["page_count"] = 1
+                logger.info("Raw XML zip fallback successfully extracted text from DOCX.")
+            except Exception as fallback_err:
+                raise RuntimeError(
+                    f"Word (DOCX) text extraction failed. python-docx error: {docx_err}. "
+                    f"XML zip fallback error: {fallback_err}"
+                )
 
     # PDF Files
     elif file_path_lower.endswith(".pdf") or file_type == "application/pdf":
@@ -296,19 +324,36 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
             document.file_path, document.file_type, ocr=ocr
         )
 
-        # Setup structural splitter
+        # Setup splitter
         is_markdown = (
             document.file_type == "text/markdown"
             or document.file_path.lower().endswith((".md", ".markdown"))
         )
-        from services.chunking import StructuralTextSplitter
-        splitter = StructuralTextSplitter(
-            chunk_size=settings.CHUNK_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
-            is_markdown=is_markdown,
-        )
-
-        chunks = splitter.split_pages(pages_data)
+        
+        chunks = []
+        if not is_markdown:
+            try:
+                from services.chunking import SemanticSimilaritySplitter
+                logger.info(f"Attempting semantic similarity chunking for {document.filename}")
+                semantic_splitter = SemanticSimilaritySplitter(
+                    chunk_size=settings.CHUNK_SIZE,
+                    chunk_overlap=settings.CHUNK_OVERLAP,
+                )
+                chunks = await semantic_splitter.split_pages_semantic(
+                    pages_data, embedding_provider, model_name
+                )
+            except Exception as e:
+                logger.exception(f"Semantic similarity chunking failed for {document.filename}, falling back to structural splitter: {e}")
+                
+        if not chunks:
+            from services.chunking import StructuralTextSplitter
+            logger.info(f"Using structural text splitter for {document.filename}")
+            splitter = StructuralTextSplitter(
+                chunk_size=settings.CHUNK_SIZE,
+                chunk_overlap=settings.CHUNK_OVERLAP,
+                is_markdown=is_markdown,
+            )
+            chunks = splitter.split_pages(pages_data)
         
         total_chars = sum(len(c["text"]) for c in chunks)
 

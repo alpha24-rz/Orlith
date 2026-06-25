@@ -7,6 +7,7 @@ import { formatBytes, formatRelativeTime } from '@/lib/utils'
 import { Document, DocumentStatus } from '@/lib/types'
 import { api } from '@/lib/api-client'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useAuthStore } from '@/stores/auth'
 import {
   FileText, Upload, Search, Filter, MoreVertical,
   CheckCircle2, Clock, XCircle, Trash2, Download,
@@ -40,13 +41,15 @@ const STATUS_CONFIG: Record<DocumentStatus, { label: string, icon: any, color: s
 }
 
 const getWebSocketUrl = (workspaceId: string) => {
+  const token = useAuthStore.getState().token
+  const query = token ? `?token=${token}` : ''
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${protocol}//${window.location.host}/api/documents/ws/${workspaceId}`
+    return `${protocol}//${window.location.host}/api/documents/ws/${workspaceId}${query}`
   }
   const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
   const wsBase = envUrl.replace(/^http/, 'ws')
-  return `${wsBase}/documents/ws/${workspaceId}`
+  return `${wsBase}/documents/ws/${workspaceId}${query}`
 }
 
 async function fetchFilesInFolder(folderId: string, accessToken: string): Promise<any[]> {
@@ -94,7 +97,51 @@ export default function DocumentsPage() {
   const [uploadStatusText, setUploadStatusText] = useState('')
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
   const [useOcr, setUseOcr] = useState(false)
-  
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    const confirmDelete = window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} dokumen? Tindakan ini tidak dapat dibatalkan.`)
+    if (!confirmDelete) return
+
+    const total = selectedIds.length
+    let successCount = 0
+    let failCount = 0
+
+    setUploading(true)
+    setUploadStatusText(`Menghapus ${total} dokumen...`)
+    setUploadProgress(10)
+
+    for (let i = 0; i < total; i++) {
+      const id = selectedIds[i]
+      const docName = docs.find(d => d.id === id)?.name || "Dokumen"
+      setUploadStatusText(`Menghapus (${i + 1}/${total}): ${docName}...`)
+      setUploadProgress(Math.round(((i + 1) / total) * 100))
+      try {
+        await api.deleteDocument(id)
+        setDocs(prev => prev.filter(d => d.id !== id))
+        if (selectedDoc?.id === id) {
+          setSelectedDoc(null)
+        }
+        successCount++
+      } catch (err: any) {
+        failCount++
+        console.error(`Gagal menghapus ${docName}:`, err)
+        addToast("Hapus Gagal", `Gagal menghapus ${docName}: ${err.message || "Unknown error"}`, "danger")
+      }
+    }
+
+    setUploading(false)
+    setUploadStatusText('')
+    setSelectedIds([])
+
+    if (successCount === total) {
+      addToast("Sukses", `Berhasil menghapus ${successCount} dokumen.`, "success")
+    } else {
+      addToast("Selesai", `Berhasil menghapus ${successCount} dokumen, ${failCount} gagal.`, "info")
+    }
+  }
+
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([])
   const [isDriveSettingsOpen, setIsDriveSettingsOpen] = useState(false)
@@ -232,7 +279,7 @@ export default function DocumentsPage() {
     const anyWin = window as any
     anyWin.gapi.load('picker', () => {
       const view = new anyWin.google.picker.DocsView(anyWin.google.picker.ViewId.DOCS)
-      view.setMimeTypes('application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,application/vnd.google-apps.document,application/vnd.google-apps.spreadsheet,application/vnd.google-apps.presentation')
+      view.setMimeTypes('application/vnd.google-apps.folder,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,application/vnd.google-apps.document,application/vnd.google-apps.spreadsheet,application/vnd.google-apps.presentation')
       view.setIncludeFolders(true)
       view.setSelectFolderEnabled(true)
       
@@ -412,6 +459,7 @@ export default function DocumentsPage() {
 
   // Fetch initial documents & manage updates via Websocket/Polling
   useEffect(() => {
+    setSelectedIds([])
     if (!activeWorkspace?.id) return
     let active = true
     let socket: WebSocket | null = null
@@ -735,7 +783,23 @@ export default function DocumentsPage() {
           <div className="hidden md:block overflow-x-auto">
             <div className="min-w-[768px]">
               {/* Table header */}
-              <div className="grid grid-cols-[2fr_80px_80px_120px_100px_80px] gap-4 px-5 py-3 border-b border-border-subtle text-xs font-semibold text-text-muted uppercase tracking-wider">
+              <div className="grid grid-cols-[40px_2fr_80px_80px_120px_100px_80px] gap-4 px-5 py-3 border-b border-border-subtle text-xs font-semibold text-text-muted uppercase tracking-wider items-center">
+                <div className="flex items-center">
+                  <input 
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every(d => selectedIds.includes(d.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const newSelected = [...new Set([...selectedIds, ...filtered.map(d => d.id)])]
+                        setSelectedIds(newSelected)
+                      } else {
+                        const filteredIds = filtered.map(d => d.id)
+                        setSelectedIds(selectedIds.filter(id => !filteredIds.includes(id)))
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-border-strong bg-bg-panel text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
                 <span>Document</span>
                 <span>Type</span>
                 <span>Size</span>
@@ -761,9 +825,24 @@ export default function DocumentsPage() {
                   return (
                     <div
                       key={doc.id}
-                      className={`grid grid-cols-[2fr_80px_80px_120px_100px_80px] gap-4 px-5 py-3.5 items-center hover:bg-bg-hover transition-colors cursor-pointer ${i < filtered.length - 1 ? 'border-b border-border-subtle' : ''}`}
+                      className={`grid grid-cols-[40px_2fr_80px_80px_120px_100px_80px] gap-4 px-5 py-3.5 items-center hover:bg-bg-hover transition-colors cursor-pointer ${i < filtered.length - 1 ? 'border-b border-border-subtle' : ''}`}
                       onClick={() => setSelectedDoc(doc)}
                     >
+                      {/* Checkbox Column */}
+                      <div onClick={e => e.stopPropagation()} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(doc.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds(prev => [...prev, doc.id])
+                            } else {
+                              setSelectedIds(prev => prev.filter(id => id !== doc.id))
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-border-strong bg-bg-panel text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </div>
                       {/* Name */}
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-bg-panel border border-border-strong flex items-center justify-center shrink-0">
@@ -849,6 +928,21 @@ export default function DocumentsPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Checkbox Column */}
+                        <div onClick={e => e.stopPropagation()} className="flex items-center mr-0.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(doc.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, doc.id])
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== doc.id))
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-border-strong bg-bg-panel text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </div>
                         <div className="w-8 h-8 rounded-lg bg-bg-panel border border-border-strong flex items-center justify-center shrink-0">
                           {FILE_TYPE_ICONS[doc.type] || <FileText className="w-3.5 h-3.5 text-text-muted" />}
                         </div>
@@ -1006,6 +1100,31 @@ export default function DocumentsPage() {
           </div>
         ))}
       </div>
+
+      {/* Floating Action Bar for Bulk Selection */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-bg-input/90 backdrop-blur-md border border-border-strong px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 animate-slide-in pointer-events-auto">
+          <span className="text-xs font-semibold text-foreground">
+            {selectedIds.length} file{selectedIds.length > 1 ? 's' : ''} terpilih
+          </span>
+          <div className="h-4 w-px bg-border-strong" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/10 border border-red-500/20 hover:bg-red-600/20 hover:border-red-500/40 text-red-400 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Terpilih</span>
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 rounded-xl border border-border-strong hover:bg-bg-hover text-text-subtle text-xs font-semibold transition-all cursor-pointer"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      )}
 
       <GoogleDriveSettingsModal
         isOpen={isDriveSettingsOpen}

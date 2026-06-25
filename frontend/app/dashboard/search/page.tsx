@@ -158,7 +158,7 @@ export default function SearchPage() {
 
         {/* Search input */}
         <div className="relative mb-4">
-          <div className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border bg-bg-input transition-all duration-200 ${
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border bg-bg-input transition-all duration-200 ${
             loading ? 'border-indigo-500/60 shadow-lg shadow-indigo-500/10' : 'border-border-strong focus-within:border-indigo-500/50 focus-within:shadow-lg focus-within:shadow-indigo-500/5'
           }`}>
             {loading ? (
@@ -173,7 +173,7 @@ export default function SearchPage() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              placeholder="Search across all documents — e.g. 'termination clauses with break fee'"
+              placeholder="Search across all documents…"
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none"
             />
             {query && (
@@ -185,38 +185,40 @@ export default function SearchPage() {
               id="run-search-btn"
               onClick={handleSearch}
               disabled={!query.trim() || loading || !activeWorkspace}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shrink-0 active:scale-95"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shrink-0 active:scale-95 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Search
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Search</span>
             </button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-text-muted" />
+        <div className="flex flex-wrap items-center gap-3 mb-6 p-1 bg-bg-panel/20 rounded-2xl border border-border-subtle">
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-text-muted" />
+            <select
+              value={docType}
+              onChange={e => setDocType(e.target.value)}
+              className="px-3 py-1.5 rounded-xl border border-border-strong bg-bg-panel text-xs text-text-subtle focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+            >
+              {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
 
-          <select
-            value={docType}
-            onChange={e => setDocType(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-border-strong bg-bg-panel text-xs text-text-subtle focus:outline-none focus:border-indigo-500 transition-colors"
-          >
-            {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-
-          <div className="flex gap-1 ml-auto">
+          <div className="flex gap-1 items-center w-full sm:w-auto sm:ml-auto p-1 bg-bg-panel/50 rounded-xl border border-border-strong sm:border-transparent">
             {(['all', 'semantic', 'keyword'] as const).map(m => (
               <button
                 key={m}
                 id={`match-type-${m}`}
                 onClick={() => setMatchType(m)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all capitalize border ${
+                className={`flex-1 sm:flex-none text-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize cursor-pointer ${
                   matchType === m
-                    ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/30'
-                    : 'border-border-strong text-text-subtle hover:text-foreground hover:border-border-strong'
+                    ? 'bg-indigo-600/20 text-indigo-300 font-bold'
+                    : 'text-text-subtle hover:text-foreground'
                 }`}
               >
-                {m === 'all' ? 'All matches' : m === 'semantic' ? '⚡ Semantic' : '🔑 Keyword'}
+                {m === 'all' ? 'All' : m === 'semantic' ? '⚡ Semantic' : '🔑 Keyword'}
               </button>
             ))}
           </div>
@@ -326,18 +328,18 @@ export default function SearchPage() {
                     }}
                     className="rounded-2xl border border-border-strong bg-bg-input p-5 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all cursor-pointer group"
                   >
-                    <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-bg-panel border border-border-strong flex items-center justify-center shrink-0">
                           <span className={`text-[10px] font-black ${FILE_TYPE_COLORS[r.docType] || 'text-text-subtle'}`}>{r.docType}</span>
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold truncate group-hover:text-indigo-300 transition-colors">{r.docName}</div>
+                          <div className="text-sm font-semibold truncate group-hover:text-indigo-300 transition-colors" title={r.docName}>{r.docName}</div>
                           <div className="text-[10px] text-text-muted">{r.workspace} · p. {r.page}</div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                      <div className="flex items-center gap-2 sm:ml-auto shrink-0 flex-wrap">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${
                           r.matchType === 'semantic'
                             ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
                             : 'text-text-subtle bg-bg-hover border-border-strong'

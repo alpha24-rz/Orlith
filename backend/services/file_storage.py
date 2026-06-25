@@ -2,11 +2,12 @@ import os
 import shutil
 from fastapi import UploadFile
 import uuid
+from core.config import settings
 
 
 class FileStorageService:
     def __init__(self):
-        self.base_path = "./uploads"
+        self.base_path = settings.STORAGE_LOCAL_PATH
         os.makedirs(self.base_path, exist_ok=True)
 
     async def save_upload_file(self, upload_file: UploadFile) -> str:
