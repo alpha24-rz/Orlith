@@ -13,14 +13,14 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db
-from models import Document, Workspace
+from models import Document, Workspace, User
 from schemas import DocumentResponse
 from services.file_storage import storage_service
 from services.ingestion import process_document, broadcast_status
 from core.chroma import get_workspace_collection
 from core.websocket import manager
-from api.deps import get_workspace
-from typing import List
+from api.deps import get_workspace, get_current_user
+from typing import List, Optional
 import os
 import hashlib
 
@@ -34,11 +34,11 @@ async def upload_document(
     file: UploadFile = File(...),
     ocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    # Validate workspace
-    workspace = await get_workspace(workspace_id, db)
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    # Validate workspace membership
+    from api.deps import get_workspace_member
+    workspace = await get_workspace_member(workspace_id, current_user, db)
 
     from services.validation import WorkspaceValidator
     status = await WorkspaceValidator.get_workspace_status(db, workspace)
@@ -89,7 +89,13 @@ async def upload_document(
 
 
 @router.get("/{workspace_id}", response_model=List[DocumentResponse])
-async def list_documents(workspace_id: str, db: AsyncSession = Depends(get_db)):
+async def list_documents(
+    workspace_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from api.deps import get_workspace_member
+    await get_workspace_member(workspace_id, current_user, db)
     result = await db.execute(
         select(Document).where(Document.workspace_id == workspace_id)
     )
@@ -102,10 +108,14 @@ async def reprocess_document(
     background_tasks: BackgroundTasks,
     ocr: bool = False,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+        
+    from api.deps import get_workspace_member
+    await get_workspace_member(document.workspace_id, current_user, db)
 
     # Enqueue ingestion background task again
     background_tasks.add_task(process_document, document.id, db, ocr)
@@ -114,10 +124,17 @@ async def reprocess_document(
 
 
 @router.get("/{document_id}/status")
-async def get_document_status(document_id: str, db: AsyncSession = Depends(get_db)):
+async def get_document_status(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+        
+    from api.deps import get_workspace_member
+    await get_workspace_member(document.workspace_id, current_user, db)
 
     return {
         "id": document.id,
@@ -128,10 +145,17 @@ async def get_document_status(document_id: str, db: AsyncSession = Depends(get_d
 
 
 @router.delete("/{document_id}")
-async def delete_document(document_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+        
+    from api.deps import get_workspace_member
+    await get_workspace_member(document.workspace_id, current_user, db)
 
     # Delete from local file storage
     try:
@@ -154,10 +178,17 @@ async def delete_document(document_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{document_id}/download")
-async def download_document(document_id: str, db: AsyncSession = Depends(get_db)):
+async def download_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     document = await db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+        
+    from api.deps import get_workspace_member
+    await get_workspace_member(document.workspace_id, current_user, db)
     
     if not os.path.exists(document.file_path):
         raise HTTPException(status_code=404, detail="Physical file not found")
@@ -173,7 +204,51 @@ async def download_document(document_id: str, db: AsyncSession = Depends(get_db)
 
 
 @router.websocket("/ws/{workspace_id}")
-async def websocket_endpoint(websocket: WebSocket, workspace_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    workspace_id: str,
+    token: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    from jose import jwt, JWTError
+    from core.config import settings
+    from core.security import ALGORITHM
+    from models.workspace_member import WorkspaceMember
+    
+    # Read token from cookies if not in query params
+    if not token:
+        token = websocket.cookies.get("token")
+        
+    if not token:
+        await websocket.close(code=4003)
+        return
+        
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            await websocket.close(code=4003)
+            return
+    except JWTError:
+        await websocket.close(code=4003)
+        return
+        
+    user_res = await db.execute(select(User).where(User.email == email))
+    user = user_res.scalars().first()
+    if not user:
+        await websocket.close(code=4003)
+        return
+        
+    stmt = select(Workspace).outerjoin(WorkspaceMember).where(
+        (Workspace.id == workspace_id) &
+        ((Workspace.owner_id == user.id) | (WorkspaceMember.user_id == user.id))
+    )
+    ws_res = await db.execute(stmt)
+    workspace = ws_res.scalars().first()
+    if not workspace:
+        await websocket.close(code=4003)
+        return
+
     await manager.connect(workspace_id, websocket)
     try:
         while True:

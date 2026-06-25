@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Eye, EyeOff, ArrowRight } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import Prism from "@/components/Prism"
 import { useAuthStore } from "@/stores/auth"
 import { axiosClient } from "@/lib/axios-client"
@@ -11,9 +12,11 @@ import { axiosClient } from "@/lib/axios-client"
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
   const [agreedToTerms, setAgreedToTerms] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
+  console.log("HELLO FROM CLIENT", { mounted })
   const [isTransitioning, setIsTransitioning] = useState(false)
 
   const [firstName, setFirstName] = useState("")
@@ -25,6 +28,11 @@ export default function AuthPage() {
 
   const router = useRouter()
   const setAuth = useAuthStore((state) => state.setAuth)
+  const { setTheme } = useTheme()
+
+  useEffect(() => {
+    setTheme("dark")
+  }, [setTheme])
 
   const slides = [
     {
@@ -111,7 +119,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="dark min-h-screen bg-background text-foreground flex items-center justify-center p-4 relative overflow-hidden">
       {/* Prism Background */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-80 mix-blend-screen">
         <Prism

@@ -226,11 +226,27 @@ function AgentStepsPanel({ steps, isRunning, streamingText }: {
 // ─── Citation Pill Component ─────────────────────────────────────────────────
 function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; index: number; onOpenDoc: () => void }) {
   const [expanded, setExpanded] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const num = citation.citationNumber ?? index + 1
   const relevancePct = citation.relevanceScore ? Math.round(citation.relevanceScore * 100) : null
 
+  useEffect(() => {
+    if (!expanded) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setExpanded(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [expanded])
+
   return (
-    <div className="relative inline-block">
+    <div ref={containerRef} className="relative inline-block">
       <button
         onClick={() => setExpanded(!expanded)}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-panel border border-border-strong hover:border-indigo-500/40 hover:bg-indigo-600/5 text-xs text-indigo-400 transition-all duration-200"
@@ -270,7 +286,7 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
           </div>
           {/* Actions */}
           <button
-            onClick={(e) => { e.stopPropagation(); onOpenDoc() }}
+            onClick={(e) => { e.stopPropagation(); onOpenDoc(); setExpanded(false); }}
             className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-xs text-indigo-400 hover:text-indigo-300 transition-all"
           >
             <FileText className="w-3 h-3" />
@@ -327,6 +343,7 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null)
+  const citationPanelRef = useRef<HTMLDivElement>(null)
 
   const copy = () => {
     navigator.clipboard.writeText(message.content)
@@ -337,6 +354,24 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
   const handleCitationClick = (citation: Citation) => {
     setActiveCitation(activeCitation?.docId === citation.docId && activeCitation?.page === citation.page ? null : citation)
   }
+
+  useEffect(() => {
+    if (!activeCitation) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const isCitationBtn = target.closest('button')?.getAttribute('title')?.includes('Sumber') || target.closest('button')?.getAttribute('title')?.includes('— p.')
+      
+      if (citationPanelRef.current && !citationPanelRef.current.contains(target) && !isCitationBtn) {
+        setActiveCitation(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [activeCitation])
 
   if (isUser) {
     return (
@@ -460,7 +495,7 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
 
         {/* Active citation detail panel */}
         {activeCitation && (
-          <div className="mb-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 animate-fade-in">
+          <div ref={citationPanelRef} className="mb-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-3.5 h-3.5 text-indigo-400" />
@@ -478,7 +513,7 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
               &ldquo;{activeCitation.fullText || activeCitation.snippet}&rdquo;
             </p>
             <button
-              onClick={() => onOpenDoc(activeCitation)}
+              onClick={() => { onOpenDoc(activeCitation); setActiveCitation(null); }}
               className="mt-2 text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
             >
               Buka dokumen <ChevronRight className="w-3 h-3" />
@@ -1509,10 +1544,10 @@ function ChatPageInner() {
         </div>
 
         {/* Input area */}
-        <div className="p-4 border-t border-border-subtle shrink-0 bg-background flex flex-col gap-3">
+        <div className="p-3 sm:p-4 border-t border-border-subtle shrink-0 bg-background flex flex-col gap-2 sm:gap-3">
 
 
-          <div className="flex flex-col gap-2 rounded-2xl border border-border-strong bg-bg-input backdrop-blur-md focus-within:border-indigo-500/50 focus-within:shadow-lg focus-within:shadow-indigo-500/5 transition-all duration-200 p-3">
+          <div className="flex flex-col gap-2 rounded-2xl border border-border-strong bg-bg-input backdrop-blur-md focus-within:border-indigo-500/50 focus-within:shadow-lg focus-within:shadow-indigo-500/5 transition-all duration-200 p-2.5 sm:p-3">
             <textarea
               ref={inputRef}
               id="chat-input"
@@ -1521,21 +1556,21 @@ function ChatPageInner() {
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about your documents…"
               rows={2}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed"
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[44px] max-h-[160px]"
             />
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
               {/* Model picker + Agent Mode toggle + Research button */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Deep Research button */}
                 <button
                   id="deep-research-btn"
                   onClick={() => setResearchModalOpen(true)}
                   title="Deep Research — riset mendalam lintas dokumen"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-emerald-500/30 hover:bg-emerald-500/5 text-xs font-medium text-text-subtle hover:text-emerald-400 transition-all"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-emerald-500/30 hover:bg-emerald-500/5 text-xs font-medium text-text-subtle hover:text-emerald-400 transition-all cursor-pointer"
                 >
-                  <FlaskConical className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Research</span>
-                  {researchRunning && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                  <FlaskConical className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden md:inline">Research</span>
+                  {researchRunning && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
                 </button>
 
                 {/* Agent Mode toggle */}
@@ -1543,14 +1578,14 @@ function ChatPageInner() {
                   id="agent-mode-toggle"
                   onClick={() => setAgentMode(a => !a)}
                   title={agentMode ? 'Mode Agent aktif — klik untuk nonaktifkan' : 'Aktifkan Agent Mode'}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${agentMode
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${agentMode
                     ? 'bg-violet-600/20 border-violet-500/40 text-violet-300 shadow-sm shadow-violet-500/10'
                     : 'border-border-strong bg-bg-panel hover:border-violet-500/30 text-text-subtle hover:text-violet-400'
                     }`}
                 >
-                  <Bot className="w-3.5 h-3.5" />
-                  <span>Agent</span>
-                  {agentMode && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />}
+                  <Bot className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden md:inline">Agent</span>
+                  {agentMode && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0" />}
                 </button>
 
                 {/* Model picker */}
@@ -1558,14 +1593,16 @@ function ChatPageInner() {
                   <button
                     id="model-selector"
                     onClick={() => setModelMenuOpen(!modelMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-border-strong text-xs font-medium transition-all"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-border-strong text-xs font-medium transition-all cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    {selectedModel ? selectedModel.name : 'Select Model'}
-                    <ChevronDown className="w-3 h-3 text-text-muted" />
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span className="truncate max-w-[70px] sm:max-w-[120px] md:max-w-[150px]">
+                      {selectedModel ? selectedModel.name : 'Select Model'}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />
                   </button>
                   {modelMenuOpen && (
-                    <div className="absolute right-0 bottom-full mb-1 w-64 rounded-xl border border-border-strong bg-bg-input shadow-xl z-20 overflow-hidden max-h-96 flex flex-col">
+                    <div className="absolute left-0 bottom-full mb-1 w-64 rounded-xl border border-border-strong bg-bg-input shadow-xl z-20 overflow-hidden max-h-96 flex flex-col">
                       <div className="p-2 border-b border-border-strong">
                         <div className="relative">
                           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -1674,13 +1711,13 @@ function ChatPageInner() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-text-muted">⏎ Send · ⇧⏎ New line</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] text-text-muted hidden md:inline">⏎ Send · ⇧⏎ New line</span>
                 <button
                   id="send-message-btn"
                   onClick={sendMessage}
                   disabled={!input.trim() || loading}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
                 >
                   <Send className="w-3.5 h-3.5 text-foreground" />
                 </button>

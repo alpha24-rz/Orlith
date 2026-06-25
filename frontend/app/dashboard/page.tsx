@@ -108,8 +108,13 @@ export default function DashboardPage() {
     fetchDocuments()
     fetchStats()
 
-    // Setup WebSocket
-    const ws = new WebSocket(`ws://localhost:8000/documents/ws/${activeWorkspaceId}`)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    let baseUrl = 'localhost:8000'
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('http://', '').replace('https://', '')
+    }
+    const token = useAuthStore.getState().token
+    const ws = new WebSocket(`${protocol}//${baseUrl}/documents/ws/${activeWorkspaceId}${token ? `?token=${token}` : ''}`)
 
     ws.onmessage = (event) => {
       try {
@@ -163,7 +168,8 @@ export default function DashboardPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/documents/${id}/process`, { method: 'POST' })
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${baseUrl}/documents/${id}/process`, { method: 'POST' })
       if (res.ok) {
         addToast("Re-embed Started", "Document is being processed again.", "info")
       }

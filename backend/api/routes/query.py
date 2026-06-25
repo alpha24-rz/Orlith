@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Optional
 from core.database import get_db
+from models.user import User
+from api.deps import get_current_user, get_workspace_member
 from services.ai import AIOrchestrator
 from services.ai.retrieval.search import semantic_search_docs
 
@@ -30,12 +32,17 @@ class SearchRequest(BaseModel):
 
 
 @router.post("")
-async def query_workspace(request: QueryRequest, db: AsyncSession = Depends(get_db)):
+async def query_workspace(
+    request: QueryRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    await get_workspace_member(request.workspace_id, current_user, db)
     orchestrator = AIOrchestrator(db)
     return StreamingResponse(
         orchestrator.route_query(
             workspace_id=request.workspace_id,
-            user_id=None,  # Will resolve workspace owner in mode
+            user_id=current_user.id,
             query=request.message,
             mode="chat",
             conversation_id=request.conversation_id,
@@ -50,11 +57,17 @@ async def query_workspace(request: QueryRequest, db: AsyncSession = Depends(get_
 
 
 @router.post("/search")
-async def semantic_search(request: SearchRequest, db: AsyncSession = Depends(get_db)):
+async def semantic_search(
+    request: SearchRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Perform semantic (vector) search across all documents in a workspace.
     Returns ranked document chunks with relevance scores and metadata.
     """
+    await get_workspace_member(request.workspace_id, current_user, db)
     results = await semantic_search_docs(
         request.workspace_id, request.query, request.top_k, db
     )
     return {"results": results}
+

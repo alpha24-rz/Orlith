@@ -2,14 +2,20 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Brain, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { axiosClient } from '@/lib/axios-client'
 import { useAuthStore } from '@/stores/auth'
 
 export default function RegisterPage() {
   const router = useRouter()
   const setAuth = useAuthStore(state => state.setAuth)
+  const { setTheme } = useTheme()
+  
+  useEffect(() => {
+    setTheme('dark')
+  }, [setTheme])
   
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F9FAFB;
-  --foreground: #111827;
+  --background: #F0F8FF;
+  --foreground: #1E293B;
 
-  --bg-sidebar: #FFFFFF;
+  --bg-sidebar: #E6F0FA;
   --bg-panel: #FFFFFF;
-  --bg-hover: #F3F4F6;
-  --bg-input: #FFFFFF;
+  --bg-hover: #E1EDFA;
+  --bg-input: #F7FAFC;
 
-  --border-subtle: #E5E7EB;
-  --border-strong: #D1D5DB;
+  --border-subtle: #E2ECF8;
+  --border-strong: #C6D8E8;
 
-  --text-muted: #6B7280;
-  --text-subtle: #4B5563;
+  --text-muted: #64748B;
+  --text-subtle: #475569;
 
-  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.4);
+  --scrollbar-thumb: rgba(70, 130, 180, 0.2);
+  --scrollbar-thumb-hover: rgba(70, 130, 180, 0.4);
 }
 
 .dark {
@@ -48,7 +48,7 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-bg-sidebar: var(--bg-sidebar);

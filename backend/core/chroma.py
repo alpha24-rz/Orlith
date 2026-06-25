@@ -3,10 +3,10 @@ from chromadb.config import Settings
 from core.config import settings
 import os
 
-_client: chromadb.PersistentClient | None = None
+_client: chromadb.ClientAPI | None = None
 
 
-def get_chroma_client() -> chromadb.PersistentClient:
+def get_chroma_client() -> chromadb.ClientAPI:
     global _client
     if _client is None:
         os.makedirs(settings.CHROMA_PERSIST_DIR, exist_ok=True)

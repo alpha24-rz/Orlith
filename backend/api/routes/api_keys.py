@@ -132,3 +132,25 @@ async def delete_api_key(
     await db.commit()
     from services.ai.registry import ModelRegistry
     ModelRegistry.invalidate_cache(current_user.id)
+
+
+@router.post("/{key_id}/validate")
+async def validate_existing_key(
+    key_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Test if an existing API key is still valid with a lightweight probe."""
+    key = await db.get(UserAPIKey, key_id)
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    if key.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to validate this key")
+
+    try:
+        raw_key = decrypt_api_key(key.encrypted_key)
+        adapter = get_provider_adapter(key.provider, raw_key)
+        valid = await adapter.validate_api_key()
+        return {"valid": valid}
+    except Exception as e:
+        return {"valid": False, "error": str(e)}

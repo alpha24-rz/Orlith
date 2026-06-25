@@ -1,12 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Brain, Mail, Lock, User, Building2, ArrowRight, CheckCircle } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 const STEPS = ['Create account', 'Set up workspace', 'Done']
 
 export default function SignupPage() {
+  const { setTheme } = useTheme()
+  
+  useEffect(() => {
+    setTheme('dark')
+  }, [setTheme])
+
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({

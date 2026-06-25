@@ -6,7 +6,7 @@ import {
   Settings, Users, Brain, Shield, CreditCard, Bell,
   Plus, Trash2, Mail, Crown, Edit2, Eye, ChevronRight,
   Save, Check, X, Key, Globe, Zap, Database, Lock,
-  ExternalLink, AlertCircle, CheckCircle2, Copy, Download, Loader2, Building2, Sparkles
+  ExternalLink, AlertCircle, CheckCircle2, Copy, Download, Loader2, Building2, Sparkles, RefreshCw
 } from 'lucide-react'
 
 import { axiosClient } from '@/lib/axios-client'
@@ -63,6 +63,7 @@ export default function SettingsPage() {
   const [newKeyString, setNewKeyString] = useState('')
   const [newKeyNickname, setNewKeyNickname] = useState('')
   const [isAddingKey, setIsAddingKey] = useState(false)
+  const [keyStatuses, setKeyStatuses] = useState<Record<string, { status: 'checking' | 'connected' | 'disconnected', error?: string }>>({})
   
   // Local state for workspace details
   const [wsName, setWsName] = useState('')
@@ -123,6 +124,41 @@ export default function SettingsPage() {
       setLoadingApiKeys(false)
     }
   }
+
+  const validateApiKey = async (keyId: string) => {
+    setKeyStatuses(prev => ({
+      ...prev,
+      [keyId]: { status: 'checking' }
+    }))
+    try {
+      const res = await axiosClient.post(`/api-keys/${keyId}/validate`)
+      if (res.data && res.data.valid) {
+        setKeyStatuses(prev => ({
+          ...prev,
+          [keyId]: { status: 'connected' }
+        }))
+      } else {
+        setKeyStatuses(prev => ({
+          ...prev,
+          [keyId]: { status: 'disconnected', error: res.data?.error || 'Validation failed' }
+        }))
+      }
+    } catch (err: any) {
+      setKeyStatuses(prev => ({
+        ...prev,
+        [keyId]: { status: 'disconnected', error: err.response?.data?.detail || 'Verification error' }
+      }))
+    }
+  }
+
+  // Trigger validation when keys are fetched
+  useEffect(() => {
+    if (apiKeys.length > 0) {
+      apiKeys.forEach(k => {
+        validateApiKey(k.id)
+      })
+    }
+  }, [apiKeys])
 
   useEffect(() => {
     if (activeWorkspace) {
@@ -744,19 +780,58 @@ export default function SettingsPage() {
             {apiKeys.map(k => (
               <div key={k.id} className="flex items-center justify-between p-3 bg-bg-panel border border-border-strong rounded-xl">
                 <div>
-                  <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <div className="text-sm font-bold text-foreground flex items-center gap-2 flex-wrap">
                     {k.nickname || k.provider}
                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-wider">{k.provider}</span>
+                    {(() => {
+                      const statusInfo = keyStatuses[k.id];
+                      if (!statusInfo) return null;
+                      if (statusInfo.status === 'checking') {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            Checking...
+                          </span>
+                        )
+                      }
+                      if (statusInfo.status === 'connected') {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full" title="Connected successfully">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                            Connected
+                          </span>
+                        )
+                      }
+                      if (statusInfo.status === 'disconnected') {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full" title={statusInfo.error || "Key validation failed"}>
+                            <AlertCircle className="w-2.5 h-2.5 text-rose-400" />
+                            Disconnected
+                          </span>
+                        )
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div className="text-xs text-text-muted mt-1 font-mono">{k.masked_key}</div>
                 </div>
-                <button
-                  onClick={() => handleDeleteApiKey(k.id)}
-                  className="p-2 text-text-muted hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                  title="Remove Key"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => validateApiKey(k.id)}
+                    disabled={keyStatuses[k.id]?.status === 'checking'}
+                    className="p-2 text-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors disabled:opacity-50"
+                    title="Test Connection"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${keyStatuses[k.id]?.status === 'checking' ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteApiKey(k.id)}
+                    className="p-2 text-text-muted hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    title="Remove Key"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { 
   GitCompare, Send, Zap, Clock, AlertCircle, Sparkles, 
-  ThumbsUp, HelpCircle, History, MessageSquare, BarChart2
+  ThumbsUp, HelpCircle, History, MessageSquare, BarChart2,
+  ChevronDown, Search
 } from 'lucide-react'
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip
@@ -21,6 +22,98 @@ interface VoteHistoryItem {
   response_b: string
   vote: string
   created_at: string
+}
+
+interface SearchableSelectProps {
+  label: string
+  value: string
+  onChange: (val: string) => void
+  options: any[]
+  disabled?: boolean
+  placeholder?: string
+}
+
+function SearchableSelect({ label, value, onChange, options, disabled, placeholder = "Search model..." }: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  const selectedOption = options.find(o => o.id === value)
+
+  const filteredOptions = options.filter(o => {
+    const term = search.toLowerCase()
+    const name = (o.display_name || o.id).toLowerCase()
+    const provider = (o.provider || '').toLowerCase()
+    return name.includes(term) || provider.includes(term)
+  })
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">{label}</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-xs font-semibold text-foreground text-left flex items-center justify-between focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <span className="truncate">
+          {selectedOption ? `${selectedOption.display_name || selectedOption.id} (${selectedOption.provider})` : "Select a model"}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-text-muted shrink-0 ml-2" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1.5 rounded-xl border border-border-strong bg-bg-input shadow-2xl p-2 space-y-2 animate-fade-in max-h-60 flex flex-col">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border-strong bg-bg-panel text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-colors"
+              autoFocus
+            />
+          </div>
+          <div className="overflow-y-auto flex-1 divide-y divide-border-subtle/30 pr-0.5 mt-1">
+            {filteredOptions.length === 0 ? (
+              <div className="text-center py-4 text-xs text-text-muted">No models found</div>
+            ) : (
+              filteredOptions.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(o.id)
+                    setIsOpen(false)
+                    setSearch('')
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                    o.id === value
+                      ? 'bg-indigo-600/20 text-indigo-300 font-bold'
+                      : 'hover:bg-bg-hover text-text-subtle hover:text-foreground'
+                  }`}
+                >
+                  <span className="truncate">{o.display_name || o.id}</span>
+                  <span className="text-[10px] text-text-muted font-normal uppercase shrink-0 ml-2">{o.provider}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ModelComparisonPage() {
@@ -288,34 +381,22 @@ export default function ModelComparisonPage() {
           <form onSubmit={handleCompare} className="space-y-5">
             {/* Dropdowns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">Model A</label>
-                <select
-                  value={modelA}
-                  onChange={(e) => setModelA(e.target.value)}
-                  disabled={streaming}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-xs font-semibold text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
-                >
-                  {availableModels.length === 0 && <option value="">No models connected</option>}
-                  {availableModels.map((m: any) => (
-                    <option key={m.id} value={m.id}>{m.display_name || m.id} ({m.provider})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">Model B</label>
-                <select
-                  value={modelB}
-                  onChange={(e) => setModelB(e.target.value)}
-                  disabled={streaming}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-xs font-semibold text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
-                >
-                  {availableModels.length === 0 && <option value="">No models connected</option>}
-                  {availableModels.map((m: any) => (
-                    <option key={m.id} value={m.id}>{m.display_name || m.id} ({m.provider})</option>
-                  ))}
-                </select>
-              </div>
+              <SearchableSelect
+                label="Model A"
+                value={modelA}
+                onChange={setModelA}
+                options={availableModels}
+                disabled={streaming}
+                placeholder="Search Model A..."
+              />
+              <SearchableSelect
+                label="Model B"
+                value={modelB}
+                onChange={setModelB}
+                options={availableModels}
+                disabled={streaming}
+                placeholder="Search Model B..."
+              />
             </div>
 
             {/* Query Input */}
@@ -358,7 +439,7 @@ export default function ModelComparisonPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
               {/* Model A response panel */}
-              <div className="rounded-2xl border border-border-subtle bg-background/40 flex flex-col min-h-[300px]">
+              <div className="rounded-2xl border border-border-subtle bg-background/40 flex flex-col min-h-[300px] min-w-0 w-full overflow-hidden">
                 {/* Header metrics */}
                 <div className="p-4 border-b border-border-subtle bg-background/80 flex items-center justify-between">
                   <div>
@@ -382,7 +463,7 @@ export default function ModelComparisonPage() {
                   </div>
                 </div>
                 {/* Content */}
-                <div className="flex-1 p-5 text-xs leading-relaxed text-foreground font-normal whitespace-pre-wrap overflow-y-auto">
+                <div className="flex-1 p-5 text-xs leading-relaxed text-foreground font-normal whitespace-pre-wrap break-words overflow-x-hidden overflow-y-auto">
                   {responseA || (
                     <span className="text-text-muted italic animate-pulse">Waiting for stream response...</span>
                   )}
@@ -390,7 +471,7 @@ export default function ModelComparisonPage() {
               </div>
 
               {/* Model B response panel */}
-              <div className="rounded-2xl border border-border-subtle bg-background/40 flex flex-col min-h-[300px]">
+              <div className="rounded-2xl border border-border-subtle bg-background/40 flex flex-col min-h-[300px] min-w-0 w-full overflow-hidden">
                 {/* Header metrics */}
                 <div className="p-4 border-b border-border-subtle bg-background/80 flex items-center justify-between">
                   <div>
@@ -414,7 +495,7 @@ export default function ModelComparisonPage() {
                   </div>
                 </div>
                 {/* Content */}
-                <div className="flex-1 p-5 text-xs leading-relaxed text-foreground font-normal whitespace-pre-wrap overflow-y-auto">
+                <div className="flex-1 p-5 text-xs leading-relaxed text-foreground font-normal whitespace-pre-wrap break-words overflow-x-hidden overflow-y-auto">
                   {responseB || (
                     <span className="text-text-muted italic animate-pulse">Waiting for stream response...</span>
                   )}

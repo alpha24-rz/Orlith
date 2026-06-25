@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from core.database import get_db
 from models import Workspace, User
 from schemas import WorkspaceCreate, WorkspaceResponse, WorkspaceUpdate, WorkspaceAISettingsUpdate
-from api.deps import get_current_user, get_user_workspace
+from api.deps import get_current_user, get_user_workspace, get_workspace_member
 from typing import List
 from core.rate_limit import limiter
 
@@ -119,7 +119,7 @@ async def update_ai_settings(
 
 @router.get("/{workspace_id}/stats")
 async def get_workspace_stats(
-    workspace: Workspace = Depends(get_user_workspace),
+    workspace: Workspace = Depends(get_workspace_member),
     db: AsyncSession = Depends(get_db),
 ):
     from sqlalchemy import func
@@ -153,7 +153,7 @@ async def get_workspace_stats(
 
 @router.get("/{workspace_id}/analytics")
 async def get_workspace_analytics(
-    workspace: Workspace = Depends(get_user_workspace),
+    workspace: Workspace = Depends(get_workspace_member),
     db: AsyncSession = Depends(get_db),
 ):
     from sqlalchemy import func, select
@@ -520,7 +520,7 @@ from schemas.workspace import WorkspaceMemberInvite, WorkspaceMemberRoleUpdate
 
 @router.get("/{workspace_id}/members")
 async def get_workspace_members(
-    workspace: Workspace = Depends(get_user_workspace),
+    workspace: Workspace = Depends(get_workspace_member),
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),

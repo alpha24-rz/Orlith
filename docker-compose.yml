@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      network: host
     container_name: documind-backend
-    ports:
-      - "8000:8000"
+    network_mode: "host"
     volumes:
       - ./data:/app/data
     env_file:
@@ -31,34 +29,16 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      network: host
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: documind-frontend
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      # Browser-visible URL — must be reachable from the user's machine
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      # Server-side rewrite target — uses Docker internal hostname
-      - BACKEND_URL=http://backend:8000
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: documind-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: documind
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: documind
+    network_mode: "host"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     restart: unless-stopped
-
-volumes:
-  data:
-  pgdata:

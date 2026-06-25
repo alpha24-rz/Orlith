@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "DocuMind AI"
     ENVIRONMENT: str = "development"
     SECRET_KEY: str = "replace-this-with-a-very-long-secret-key-min-32-chars"
+    ADMIN_INVITE_CODE: str = ""
     
     # AI Settings
     OPENROUTER_API_KEY: str = ""

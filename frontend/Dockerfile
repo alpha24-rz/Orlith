@@ -7,7 +7,12 @@ RUN npm install
 
 COPY . .
 
-# We need to build Next.js for production or we can just run dev mode
-# For MVP docker-compose, running dev mode is often easier, but let's do a build for a proper image
-# Wait, for now let's just use dev server to make it simple and allow live-reload with volumes
-CMD ["npm", "run", "dev"]
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Build Next.js for production
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]
