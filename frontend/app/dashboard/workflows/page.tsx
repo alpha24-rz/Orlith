@@ -186,10 +186,12 @@ function WorkflowBuilder() {
         <button 
           onClick={saveWorkflow}
           disabled={isSaving}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
+          className="flex items-center justify-center gap-1.5 p-2 sm:px-4 sm:py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
         >
           {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {isSaving ? 'Saving...' : 'Save Workflow'}
+          <span className="hidden sm:inline">
+            {isSaving ? 'Saving...' : 'Save Workflow'}
+          </span>
         </button>
       </div>
 
