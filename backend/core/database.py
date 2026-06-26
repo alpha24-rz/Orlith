@@ -40,6 +40,13 @@ async def init_db():
                 )
             except Exception:
                 pass
+
+            try:
+                await conn.execute(
+                    text("ALTER TABLE documents ADD COLUMN error_message VARCHAR")
+                )
+            except Exception:
+                pass
             
             # Migrate Workspace AI configs
             for col in ["active_llm_provider", "active_llm_model", "active_embedding_provider", "active_embedding_model"]:
