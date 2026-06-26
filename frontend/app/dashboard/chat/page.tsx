@@ -760,7 +760,7 @@ function DeepResearchPanel({
         {isDone && finalJobId && (
           <button
             onClick={onViewReport}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-foreground text-xs font-semibold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
           >
             <ScrollText className="w-3.5 h-3.5" />
             Lihat Laporan Lengkap
@@ -1719,7 +1719,7 @@ function ChatPageInner() {
                   disabled={!input.trim() || loading}
                   className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
                 >
-                  <Send className="w-3.5 h-3.5 text-foreground" />
+                  <Send className="w-3.5 h-3.5 text-white" />
                 </button>
               </div>
             </div>
@@ -1863,7 +1863,7 @@ function ChatPageInner() {
                   startDeepResearch(researchQuery)
                 }}
                 disabled={!researchQuery.trim() || researchRunning}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-foreground transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
               >
                 <FlaskConical className="w-3.5 h-3.5" />
                 Mulai Riset
