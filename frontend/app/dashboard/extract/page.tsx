@@ -115,36 +115,40 @@ function FieldRow({
   onRemove: (i: number) => void
 }) {
   return (
-    <div className="flex items-center gap-2 animate-fade-in group">
-      <GripVertical className="w-3.5 h-3.5 text-[#3A3A4E] shrink-0 cursor-grab" />
-      <input
-        type="text"
-        value={field.name}
-        onChange={e => onChange(index, { name: e.target.value })}
-        placeholder="Field name (e.g. Invoice Number)"
-        className="flex-1 px-3 py-1.5 rounded-lg border border-border-strong bg-bg-panel text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-colors"
-      />
-      <div className="relative">
-        <select
-          value={field.type}
-          onChange={e => onChange(index, { type: e.target.value as ExtractionField['type'] })}
-          className="pl-2 pr-6 py-1.5 rounded-lg border border-border-strong bg-bg-panel text-xs text-indigo-300 focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer font-mono"
-        >
-          {FIELD_TYPES.map(t => (
-            <option key={t} value={t}>
-              {TYPE_ICONS[t]} {t}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+    <div className="flex flex-col sm:flex-row gap-2 animate-fade-in group pb-3 sm:pb-0 border-b border-border-strong/40 sm:border-0">
+      <div className="flex items-center gap-2 w-full sm:flex-1">
+        <GripVertical className="w-3.5 h-3.5 text-[#3A3A4E] shrink-0 cursor-grab" />
+        <input
+          type="text"
+          value={field.name}
+          onChange={e => onChange(index, { name: e.target.value })}
+          placeholder="Field name (e.g. Invoice Number)"
+          className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-border-strong bg-bg-panel text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500 transition-colors"
+        />
       </div>
-      <button
-        onClick={() => onRemove(index)}
-        className="p-1 text-[#3A3A4E] hover:text-red-400 transition-colors"
-        title="Remove field"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
+      <div className="flex items-center gap-2 justify-between sm:justify-start w-full sm:w-auto pl-[22px] sm:pl-0">
+        <div className="relative flex-1 sm:flex-initial min-w-0">
+          <select
+            value={field.type}
+            onChange={e => onChange(index, { type: e.target.value as ExtractionField['type'] })}
+            className="w-full sm:w-auto pl-2 pr-6 py-1.5 rounded-lg border border-border-strong bg-bg-panel text-xs text-indigo-300 focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer font-mono"
+          >
+            {FIELD_TYPES.map(t => (
+              <option key={t} value={t}>
+                {TYPE_ICONS[t]} {t}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+        </div>
+        <button
+          onClick={() => onRemove(index)}
+          className="p-1 text-[#3A3A4E] hover:text-red-400 transition-colors shrink-0"
+          title="Remove field"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -467,7 +471,7 @@ export default function ExtractionPage() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-8 animate-fade-in">
+    <div className="h-full overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 animate-fade-in">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
@@ -510,7 +514,7 @@ export default function ExtractionPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-bg-panel border border-border-strong rounded-xl w-fit">
+        <div className="flex gap-1 p-1 bg-bg-panel border border-border-strong rounded-xl w-fit max-w-full overflow-x-auto">
           {(['jobs', 'new'] as const).map(tab => (
             <button
               key={tab}
@@ -564,7 +568,7 @@ export default function ExtractionPage() {
 
               return (
                 <div key={job.id} className="flex flex-col gap-3">
-                  <div className="rounded-2xl border border-border-strong bg-bg-input p-5 hover:border-border-strong transition-all group">
+                  <div className="rounded-2xl border border-border-strong bg-bg-input p-4 sm:p-5 hover:border-border-strong transition-all group">
                     {/* Top row */}
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="min-w-0">
@@ -736,7 +740,7 @@ export default function ExtractionPage() {
             <div className="flex flex-col gap-5">
 
               {/* Job name */}
-              <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
+              <div className="rounded-2xl border border-border-strong bg-bg-input p-4 sm:p-5">
                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
                   Job Name
@@ -752,8 +756,8 @@ export default function ExtractionPage() {
               </div>
 
               {/* Field builder */}
-              <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
-                <div className="flex items-center justify-between mb-4">
+              <div className="rounded-2xl border border-border-strong bg-bg-input p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h3 className="text-sm font-bold flex items-center gap-2">
                     <Brain className="w-4 h-4 text-indigo-400" />
                     Fields to Extract
@@ -798,7 +802,7 @@ export default function ExtractionPage() {
               </div>
 
               {/* Document picker */}
-              <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
+              <div className="rounded-2xl border border-border-strong bg-bg-input p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold flex items-center gap-2">
                     <FileText className="w-4 h-4 text-indigo-400" />
@@ -913,7 +917,7 @@ export default function ExtractionPage() {
             </div>
 
             {/* Right: Live schema preview */}
-            <div className="rounded-2xl border border-border-strong bg-bg-input p-5 flex flex-col gap-5">
+            <div className="rounded-2xl border border-border-strong bg-bg-input p-4 sm:p-5 flex flex-col gap-5">
               <div>
                 <h3 className="text-sm font-bold mb-1 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-amber-400" />
