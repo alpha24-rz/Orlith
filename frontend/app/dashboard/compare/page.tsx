@@ -203,16 +203,86 @@ export default function ModelComparisonPage() {
     if (!modelId) return DEFAULT_PROFILE
     const id = modelId.toLowerCase()
     
-    // Find longest substring match (e.g. 'gpt-4o-mini' preferred over 'gpt-4o')
+    // Cari metadata model asli dari daftar model yang tersedia
+    const modelMeta = availableModels.find(m => m.id === modelId)
+    const contextWindow = modelMeta?.context_window || 8192
+    const provider = modelMeta?.provider || ''
+
+    // 1. Tentukan nilai default awal
+    let reasoning = 80
+    let coding = 75
+    let documentAnalysis = 80
+    let longContext = 70
+    let knowledge = 80
+    let costEfficiency = 85
+
+    // 2. Analisis berdasarkan context window (Metadata asli)
+    if (contextWindow >= 1000000) {
+      longContext = 98
+    } else if (contextWindow >= 200000) {
+      longContext = 92
+    } else if (contextWindow >= 128000) {
+      longContext = 85
+    } else if (contextWindow >= 32000) {
+      longContext = 75
+    } else {
+      longContext = 60
+    }
+
+    // 3. Analisis berdasarkan provider & tipe model (Cost Efficiency)
+    if (provider === 'ollama' || id.includes('free') || id.includes('local')) {
+      costEfficiency = 100
+    } else if (id.includes('mini') || id.includes('flash') || id.includes('haiku') || id.includes('8b') || id.includes('3b') || id.includes('lite')) {
+      costEfficiency = 95
+    } else if (id.includes('opus') || id.includes('max') || id.includes('large') || id.includes('o1') || id.includes('405b') || id.includes('gpt-4-turbo')) {
+      costEfficiency = 55
+    } else {
+      costEfficiency = 80
+    }
+
+    // 4. Analisis berdasarkan tag pada ID model (Ukuran & Kemampuan)
+    if (id.includes('pro') || id.includes('opus') || id.includes('sonnet') || id.includes('max') || id.includes('70b') || id.includes('large') || id.includes('o1') || id.includes('405b') || id.includes('gpt-4o')) {
+      reasoning = 94
+      coding = 90
+      documentAnalysis = 93
+      knowledge = 94
+    } else if (id.includes('mini') || id.includes('flash') || id.includes('haiku') || id.includes('8b') || id.includes('3b') || id.includes('lite')) {
+      reasoning = 82
+      coding = 78
+      documentAnalysis = 82
+      knowledge = 82
+    }
+
+    // 5. Cek spesialisasi fungsional
+    if (id.includes('coder') || id.includes('code')) {
+      coding = Math.max(coding, 96)
+      reasoning = Math.max(reasoning, 88)
+    }
+    if (id.includes('math') || id.includes('reasoning') || id.includes('o1')) {
+      reasoning = Math.max(reasoning, 98)
+    }
+    if (id.includes('vision') || id.includes('vl') || id.includes('multimodal')) {
+      documentAnalysis = Math.max(documentAnalysis, 95)
+    }
+
+    // 6. Override khusus menggunakan profil statis populer jika terdeteksi
     const matches = Object.keys(CAPABILITY_PROFILES)
       .filter(key => id.includes(key))
       .sort((a, b) => b.length - a.length)
       
     if (matches.length > 0) {
-      return CAPABILITY_PROFILES[matches[0]]
+      const matchedProfile = { ...CAPABILITY_PROFILES[matches[0]] }
+      return {
+        reasoning: matchedProfile.reasoning,
+        coding: matchedProfile.coding,
+        documentAnalysis: matchedProfile.documentAnalysis,
+        longContext: matchedProfile.longContext || longContext,
+        knowledge: matchedProfile.knowledge,
+        costEfficiency: provider === 'ollama' ? 100 : matchedProfile.costEfficiency,
+      }
     }
-    
-    return DEFAULT_PROFILE
+
+    return { reasoning, coding, documentAnalysis, longContext, knowledge, costEfficiency }
   }
 
   const profileA = getCapabilityProfile(modelA)
@@ -581,7 +651,7 @@ export default function ModelComparisonPage() {
                   <div className="space-y-3">
                     {votesHistory.slice(0, 4).map((item) => (
                       <div key={item.id} className="flex flex-col gap-1.5 pb-3 border-b border-border-subtle/30 last:border-0 last:pb-0">
-                        <div className="text-xs text-foreground truncate w-full font-medium" title={item.query_text}>"{item.query_text}"</div>
+                        <div className="text-xs text-foreground truncate w-full font-medium" title={item.query_text}>&quot;{item.query_text}&quot;</div>
                         <div className="flex items-center justify-between text-[10px]">
                           <span className={item.vote === 'model_a' ? 'text-indigo-400 font-bold' : 'text-text-muted'}>A: {item.model_a.split('/').pop()?.slice(0, 15)}</span>
                           <span className={item.vote === 'model_b' ? 'text-emerald-400 font-bold' : 'text-text-muted'}>B: {item.model_b.split('/').pop()?.slice(0, 15)}</span>
