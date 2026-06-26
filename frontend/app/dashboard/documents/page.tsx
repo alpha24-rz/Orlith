@@ -578,26 +578,46 @@ export default function DocumentsPage() {
     }
 
     setUploading(true)
-    setUploadProgress(15)
-    addToast("Upload Started", `Uploading ${acceptedFiles[0].name}...`, "info")
+    setUploadProgress(5)
+    setUploadStatusText(`Mengunggah ${acceptedFiles.length} file...`)
+    addToast("Upload Started", `Uploading ${acceptedFiles.length} documents...`, "info")
 
-    try {
-      const newDoc = await api.uploadDocument(activeWorkspace.id, acceptedFiles[0], useOcr)
-      setUploadProgress(100)
-      setDocs(prev => {
-        const exists = prev.some(d => d.id === newDoc.id)
-        if (exists) {
-          return prev.map(d => d.id === newDoc.id ? newDoc : d)
-        }
-        return [newDoc, ...prev]
-      })
-      addToast("Upload Complete", "Document uploaded successfully. Processing started.", "success")
-    } catch (err: any) {
-      addToast("Upload Failed", err.message || "An error occurred during upload.", "danger")
-    } finally {
-      setUploading(false)
+    let successCount = 0
+    let failCount = 0
+
+    for (let i = 0; i < acceptedFiles.length; i++) {
+      const file = acceptedFiles[i]
+      const fileIndexText = `${i + 1}/${acceptedFiles.length}`
+      setUploadStatusText(`Mengunggah (${fileIndexText}): ${file.name}...`)
+      
+      try {
+        const newDoc = await api.uploadDocument(activeWorkspace.id, file, useOcr)
+        setDocs(prev => {
+          const exists = prev.some(d => d.id === newDoc.id)
+          if (exists) {
+            return prev.map(d => d.id === newDoc.id ? newDoc : d)
+          }
+          return [newDoc, ...prev]
+        })
+        successCount++
+      } catch (err: any) {
+        failCount++
+        console.error(err)
+        addToast("Upload Failed", `Failed to upload ${file.name}: ${err.message || "Unknown error"}`, "danger")
+      }
+      setUploadProgress(Math.round(((i + 1) / acceptedFiles.length) * 100))
     }
-  }, [activeWorkspace?.id, useOcr])
+
+    setUploading(false)
+    setUploadStatusText('')
+
+    if (successCount > 0) {
+      addToast("Upload Complete", `Successfully uploaded ${successCount} documents.`, "success")
+    }
+    if (failCount > 0) {
+      addToast("Upload Failed", `Failed to upload ${failCount} documents.`, "danger")
+    }
+  }, [activeWorkspace?.id, useOcr, addToast])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

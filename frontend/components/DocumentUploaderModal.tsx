@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
-import { UploadCloud, File, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { UploadCloud, File as FileIcon, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface DocumentUploaderModalProps {
   isOpen: boolean
@@ -12,10 +12,11 @@ interface DocumentUploaderModalProps {
 
 export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSuccess }: DocumentUploaderModalProps) {
   const [isDragging, setIsDragging] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [ocr, setOcr] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatusText, setUploadStatusText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -38,67 +39,96 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
     setError(null)
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileSelect(e.dataTransfer.files[0])
+      handleFilesSelect(Array.from(e.dataTransfer.files))
     }
   }, [])
 
-  const handleFileSelect = (selectedFile: File) => {
+  const handleFilesSelect = (selectedFiles: File[]) => {
     const validExtensions = ['.pdf', '.docx', '.txt', '.md']
-    const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase()
-    
-    if (!validExtensions.includes(ext)) {
-      setError(`Unsupported file format: ${ext}. Please upload PDF, DOCX, TXT, or MD.`)
-      setFile(null)
-      return
+    const validFiles: File[] = []
+    let hasInvalid = false
+
+    selectedFiles.forEach(file => {
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+      if (validExtensions.includes(ext)) {
+        validFiles.push(file)
+      } else {
+        hasInvalid = true
+      }
+    })
+
+    if (hasInvalid) {
+      setError('Beberapa file diabaikan karena format tidak didukung (Hanya PDF, DOCX, TXT, MD).')
+    } else {
+      setError(null)
     }
-    
-    setFile(selectedFile)
-    setError(null)
+
+    if (validFiles.length > 0) {
+      setFiles(prev => [...prev, ...validFiles])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleUpload = async () => {
-    if (!file || !workspaceId) return
+    if (files.length === 0 || !workspaceId) return
 
     setIsUploading(true)
     setError(null)
-    setUploadProgress(10) // Initial progress
+    setUploadProgress(5)
 
-    const formData = new FormData()
-    formData.append('workspace_id', workspaceId)
-    formData.append('file', file)
-    formData.append('ocr', String(ocr))
+    let successCount = 0
+    let failCount = 0
 
-    try {
-      setUploadProgress(50) // Mid progress
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const res = await fetch(`${baseUrl}/documents/upload`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
-      })
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const fileIndexText = `${i + 1}/${files.length}`
+      setUploadStatusText(`Mengunggah (${fileIndexText}): ${file.name}...`)
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Failed to upload document')
+      const formData = new FormData()
+      formData.append('workspace_id', workspaceId)
+      formData.append('file', file)
+      formData.append('ocr', String(ocr))
+
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const res = await fetch(`${baseUrl}/documents/upload`, {
+          method: 'POST',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.detail || 'Failed to upload document')
+        }
+
+        successCount++
+      } catch (err: any) {
+        console.error(`Gagal mengunggah ${file.name}:`, err)
+        failCount++
       }
+      setUploadProgress(Math.round(((i + 1) / files.length) * 100))
+    }
 
-      setUploadProgress(100)
-      
-      setTimeout(() => {
-        setIsUploading(false)
-        setFile(null)
-        setUploadProgress(0)
-        onUploadSuccess()
-        onClose()
-      }, 500)
+    setIsUploading(false)
+    setUploadStatusText('')
 
-    } catch (err: any) {
-      setError(err.message)
-      setIsUploading(false)
-      setUploadProgress(0)
+    if (failCount > 0) {
+      setError(`Berhasil mengunggah ${successCount} file. Gagal mengunggah ${failCount} file.`);
+      setFiles(prev => prev.slice(successCount))
+      onUploadSuccess()
+    } else {
+      setFiles([])
+      onUploadSuccess()
+      onClose()
     }
   }
+
+  const hasPdf = files.some(file => file.name.toLowerCase().endsWith('.pdf'))
 
   if (!isOpen) return null
 
@@ -107,7 +137,7 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
       <div className="w-full max-w-lg bg-bg-panel border border-border-strong rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border-subtle">
-          <h2 className="text-lg font-bold text-foreground">Upload Document</h2>
+          <h2 className="text-lg font-bold text-foreground">Upload Documents</h2>
           <button 
             onClick={onClose}
             className="p-1.5 text-text-muted hover:text-foreground hover:bg-bg-hover rounded-lg transition-colors"
@@ -118,19 +148,19 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {/* Drag & Drop Area */}
           <div 
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => !file && fileInputRef.current?.click()}
+            onClick={() => !isUploading && fileInputRef.current?.click()}
             className={`
-              relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl transition-all
+              relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl transition-all
               ${isDragging 
                 ? 'border-indigo-500 bg-indigo-500/10' 
-                : file 
-                  ? 'border-emerald-500/50 bg-emerald-500/5' 
+                : files.length > 0 
+                  ? 'border-emerald-500/30 bg-emerald-500/5 hover:border-indigo-400 hover:bg-bg-hover cursor-pointer' 
                   : 'border-border-strong hover:border-indigo-400 hover:bg-bg-hover cursor-pointer'}
             `}
           >
@@ -139,45 +169,60 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
               type="file" 
               className="hidden" 
               accept=".pdf,.docx,.txt,.md"
-              onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+              multiple
+              onChange={(e) => e.target.files && handleFilesSelect(Array.from(e.target.files))}
+              disabled={isUploading}
             />
             
-            {file ? (
-              <div className="flex flex-col items-center gap-3 text-center">
-                <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{file.name}</p>
-                  <p className="text-xs text-text-muted">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                </div>
-                {!isUploading && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                    className="text-xs text-red-400 hover:text-red-300 mt-1 font-medium"
-                  >
-                    Remove file
-                  </button>
-                )}
+            <div className="flex flex-col items-center gap-3 text-center pointer-events-none">
+              <div className="w-12 h-12 bg-bg-input border border-border-strong text-text-muted rounded-full flex items-center justify-center">
+                <UploadCloud className="w-6 h-6" />
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 text-center pointer-events-none">
-                <div className="w-12 h-12 bg-bg-input border border-border-strong text-text-muted rounded-full flex items-center justify-center">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Click or drag file to this area</p>
-                  <p className="text-xs text-text-subtle mt-1">Supports PDF, DOCX, TXT, MD</p>
-                </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Click or drag files here to upload</p>
+                <p className="text-xs text-text-subtle mt-1">Supports PDF, DOCX, TXT, MD (Multiple Files)</p>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Error Message */}
+          {/* Files List */}
+          {files.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-text-subtle">Selected Files ({files.length}):</p>
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1 border border-border-subtle rounded-xl p-3 bg-bg-input">
+                {files.map((f, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm p-2 rounded-lg bg-bg-panel border border-border-strong group">
+                    <div className="flex items-center gap-2 truncate">
+                      <FileIcon className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <span className="text-foreground font-medium truncate" title={f.name}>{f.name}</span>
+                      <span className="text-xs text-text-muted">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
+                    {!isUploading && (
+                      <button 
+                        onClick={() => removeFile(index)}
+                        className="text-text-muted hover:text-red-400 transition-colors p-1"
+                        title="Remove file"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Error / Status Message */}
           {error && (
             <div className="flex items-start gap-2 p-3 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p>{error}</p>
+              <p className="flex-1">{error}</p>
+            </div>
+          )}
+
+          {isUploading && uploadStatusText && (
+            <div className="text-xs text-indigo-400 bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-3 font-medium animate-pulse">
+              {uploadStatusText}
             </div>
           )}
 
@@ -189,7 +234,7 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
               checked={ocr}
               onChange={(e) => setOcr(e.target.checked)}
               className="w-4 h-4 rounded border-border-strong bg-bg-input text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900"
-              disabled={isUploading || (file ? !file.name.toLowerCase().endsWith('.pdf') : false)}
+              disabled={isUploading || !hasPdf}
             />
             <label htmlFor="ocr-toggle" className="text-sm text-text-subtle cursor-pointer flex flex-col">
               <span className="font-medium">Enable OCR (Scanned PDFs)</span>
@@ -209,10 +254,10 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
           </button>
           <button 
             onClick={handleUpload}
-            disabled={!file || isUploading}
+            disabled={files.length === 0 || isUploading}
             className={`
               relative flex items-center justify-center px-6 py-2 text-sm font-semibold text-white rounded-lg transition-all
-              ${!file || isUploading 
+              ${files.length === 0 || isUploading 
                 ? 'bg-indigo-600/50 cursor-not-allowed text-white/50' 
                 : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/20'}
             `}
@@ -223,7 +268,7 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
                 Uploading... {uploadProgress}%
               </>
             ) : (
-              'Upload Document'
+              `Upload ${files.length} Document${files.length > 1 ? 's' : ''}`
             )}
             
             {/* Progress bar overlay */}
