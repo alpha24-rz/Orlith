@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 from contextlib import asynccontextmanager
+import re
 from datetime import datetime, timezone
 from core.database import init_db
 from core.config import settings
@@ -82,26 +86,60 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # CORS — reads allowed origins from CORS_ORIGINS env var
-# In development allow everything; in production set CORS_ORIGINS explicitly
-cors_origins = (
-    settings.CORS_ORIGINS.split(",")
-    if settings.CORS_ORIGINS and settings.CORS_ORIGINS != "*"
-    else []
-)
-if not cors_origins or "*" in cors_origins:
-    cors_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-    ]
+# Supports wildcard patterns like https://*.vercel.app
+_raw_origins = settings.CORS_ORIGINS if settings.CORS_ORIGINS else "*"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if _raw_origins == "*":
+    # Development mode — allow everything
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # credentials cannot be used with allow_origins="*"
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Production mode — parse origins, expand wildcard patterns to regex
+    _explicit_origins: list[str] = []
+    _wildcard_patterns: list[re.Pattern] = []
+
+    for origin in [o.strip() for o in _raw_origins.split(",") if o.strip()]:
+        if "*" in origin:
+            # Convert https://*.vercel.app → regex
+            pattern = re.escape(origin).replace(r"\*", r"[^.]+")
+            _wildcard_patterns.append(re.compile(f"^{pattern}$"))
+        else:
+            _explicit_origins.append(origin)
+
+    def _is_allowed_origin(origin: str) -> bool:
+        if origin in _explicit_origins:
+            return True
+        return any(p.match(origin) for p in _wildcard_patterns)
+
+    class DynamicCORSMiddleware(BaseHTTPMiddleware):
+        """CORS middleware supporting wildcard subdomains."""
+
+        async def dispatch(self, request: Request, call_next):
+            origin = request.headers.get("origin", "")
+            is_preflight = request.method == "OPTIONS" and "access-control-request-method" in request.headers
+
+            if origin and _is_allowed_origin(origin):
+                if is_preflight:
+                    response = Response(status_code=204)
+                else:
+                    response = await call_next(request)
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+                response.headers["Access-Control-Max-Age"] = "600"
+                response.headers["Vary"] = "Origin"
+            else:
+                response = await call_next(request)
+
+            return response
+
+    app.add_middleware(DynamicCORSMiddleware)
 
 app.include_router(auth.router)
 app.include_router(api_keys.router)
