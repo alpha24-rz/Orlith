@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free"
 
     # Database
-    DATABASE_URL: str = "postgresql+psycopg://documind:password@localhost:5432/documind"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/documind.db"
     CHROMA_PERSIST_DIR: str = "./data/chroma"
 
     # File Storage

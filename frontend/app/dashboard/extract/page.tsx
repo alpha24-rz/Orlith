@@ -471,7 +471,7 @@ export default function ExtractionPage() {
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-black mb-1">Data Extraction</h1>
             <p className="text-sm text-text-subtle">
@@ -490,7 +490,7 @@ export default function ExtractionPage() {
               </div>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={fetchJobs}
               className="p-2.5 rounded-xl border border-border-strong bg-bg-panel hover:border-border-strong text-text-subtle hover:text-foreground transition-all"
@@ -501,9 +501,10 @@ export default function ExtractionPage() {
             <button
               id="new-extraction-btn"
               onClick={() => setActiveTab('new')}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold p-2.5 sm:px-4 sm:py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> New extraction
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">New extraction</span>
             </button>
           </div>
         </div>
@@ -940,7 +941,7 @@ export default function ExtractionPage() {
                       </span>
                     ))}
                   {fields.filter(f => f.name.trim()).length === 0 && (
-                    <span className="text-[#3A3A4E] italic">  // Add fields on the left</span>
+                    <span className="text-[#3A3A4E] italic">{"  // Add fields on the left"}</span>
                   )}
                   {'\n'}
                   <span className="text-[#6366F1]">{'}'}</span>

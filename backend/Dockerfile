@@ -15,10 +15,16 @@ RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/sim
 
 COPY . .
 
-# Ensure data directories exist and are owned by user 1000
-RUN mkdir -p /app/data/chroma /app/data/uploads && chown -R 1000:1000 /app
+# Create a user with UID 1000 to prevent getpwuid key errors
+RUN useradd -m -u 1000 user
 
-USER 1000
+# Ensure data directories exist and are owned by user
+RUN mkdir -p /app/data/chroma /app/data/uploads && chown -R user:user /app
+
+# Set environment variable USER to prevent getpass from querying local user db
+ENV USER=user
+
+USER user
 
 EXPOSE 7860
 
