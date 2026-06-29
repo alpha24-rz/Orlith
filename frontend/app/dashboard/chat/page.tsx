@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense, Fragment, isValidElement, cloneElement, ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { mockDocuments } from '@/lib/mock-data'
 import { ChatMessage, Citation } from '@/lib/types'
@@ -336,6 +336,36 @@ function renderContentWithCitations(
   })
 }
 
+function processCitationsInNode(
+  node: ReactNode,
+  citations: Citation[],
+  onCitationClick: (citation: Citation) => void
+): ReactNode {
+  if (typeof node === 'string') {
+    return renderContentWithCitations(node, citations, onCitationClick)
+  }
+  if (Array.isArray(node)) {
+    return node.map((child, i) => (
+      <Fragment key={i}>
+        {processCitationsInNode(child, citations, onCitationClick)}
+      </Fragment>
+    ))
+  }
+  if (isValidElement(node)) {
+    if (node.type === 'code' || node.type === 'pre' || node.type === 'button') {
+      return node
+    }
+    const children = (node.props as any)?.children
+    if (children) {
+      return cloneElement(node, {
+        ...(node.props as any),
+        children: processCitationsInNode(children, citations, onCitationClick)
+      } as any)
+    }
+  }
+  return node
+}
+
 
 // ─── Chat Bubble Component ────────────────────────────────────────────────────
 function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (citation: Citation) => void }) {
@@ -384,23 +414,24 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
   }
 
   const citations = message.citations ?? []
-  const hasInlineCitations = citations.length > 0 && /\[\d+\]/.test(message.content)
+  const hasInlineCitations = citations.length > 0 && /\[\d+(?:,\s*\d+)*\]/.test(message.content)
 
   const renderers: Components = {
     // Custom renderer untuk paragraf — inject citation badges
     p: ({ children }) => (
       <p className="mb-3 last:mb-0">
-        {typeof children === 'string'
-          ? renderContentWithCitations(children, citations, handleCitationClick)
-          : Array.isArray(children)
-            ? children.map((child, i) =>
-              typeof child === 'string'
-                ? renderContentWithCitations(child, citations, handleCitationClick)
-                : child
-            )
-            : children
-        }
+        {processCitationsInNode(children, citations, handleCitationClick)}
       </p>
+    ),
+    li: ({ children }) => (
+      <li className="mb-1">
+        {processCitationsInNode(children, citations, handleCitationClick)}
+      </li>
+    ),
+    td: ({ children }) => (
+      <td className="px-4 py-3 border-b border-border-subtle/50">
+        {processCitationsInNode(children, citations, handleCitationClick)}
+      </td>
     ),
     code({ node, inline, className, children, ...props }: any) {
       const match = /language-(\w+)/.exec(className || '')
