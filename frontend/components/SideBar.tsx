@@ -42,7 +42,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
   const { notifications, unreadCount, markAsRead, markAllRead } = useNotificationStore()
   const { setTheme, resolvedTheme } = useTheme()
 
-  const { conversations, fetchConversations, deleteConversation } = useChatStore()
+  const { conversations, fetchConversations, deleteConversation, clearConversations } = useChatStore()
 
   const [mounted, setMounted] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -358,7 +358,8 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
                   setUserMenuOpen(false)
                   clearAuth()
                   clearWorkspace()
-                  router.push('/')
+                  clearConversations()
+                  window.location.href = '/'
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/10 transition-colors text-left"
               >

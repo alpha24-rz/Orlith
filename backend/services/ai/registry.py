@@ -81,23 +81,24 @@ class ModelRegistry:
                     f"Failed to decrypt API key for provider {key.provider} of user {user_id}: {e}"
                 )
 
-        # 2. Add Ollama models (if Ollama is running)
-        try:
-            ollama_adapter = get_provider_adapter("ollama")
-            ollama_models = await ollama_adapter.get_available_models()
-            for model_name in ollama_models:
-                models.append(
-                    ModelInfo(
-                        id=model_name,
-                        display_name=model_name,
-                        provider="ollama",
-                        context_window=8192,
-                        supports_streaming=True,
-                        is_available=True
+        # 2. Add Ollama models (if Ollama is running and user-level key/provider is connected)
+        if "ollama" in connected_providers:
+            try:
+                ollama_adapter = get_provider_adapter("ollama", connected_providers["ollama"])
+                ollama_models = await ollama_adapter.get_available_models()
+                for model_name in ollama_models:
+                    models.append(
+                        ModelInfo(
+                            id=model_name,
+                            display_name=model_name,
+                            provider="ollama",
+                            context_window=8192,
+                            supports_streaming=True,
+                            is_available=True
+                        )
                     )
-                )
-        except Exception as e:
-            logger.debug(f"Ollama is offline or failed: {e}")
+            except Exception as e:
+                logger.debug(f"Ollama is offline or failed: {e}")
 
         # 3. Add OpenAI models
         if "openai" in connected_providers:
@@ -127,8 +128,9 @@ class ModelRegistry:
                     )
                 )
 
-        # 5. Add Gemini models
-        if "gemini" in connected_providers:
+        # 5. Add Gemini models (always add if system-level GEMINI_API_KEY is configured)
+        from core.config import settings
+        if "gemini" in connected_providers or settings.GEMINI_API_KEY:
             for m in NATIVE_MODELS["gemini"]:
                 models.append(
                     ModelInfo(

@@ -16,8 +16,10 @@ class Settings(BaseSettings):
     
     # AI Settings
     OPENROUTER_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     LLM_MODEL: str = "deepseek/deepseek-v3.2-exp"
-    EMBEDDING_MODEL: str = "openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free"
+    EMBEDDING_PROVIDER: str = "huggingface"
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
 
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/documind.db"
@@ -38,8 +40,13 @@ class Settings(BaseSettings):
     ENABLE_RERANKER: bool = True
     RERANKER_MODEL: str = "BAAI/bge-reranker-base"
 
+    # Semantic Chunking Settings
+    ENABLE_SEMANTIC_CHUNKING: bool = True
+
     # Hybrid Search Settings
     ENABLE_HYBRID_SEARCH: bool = True
+    BM25_TOP_K: int = 30
+    RRF_K: int = 60
     BM25_TOP_K: int = 30
     RRF_K: int = 60
 

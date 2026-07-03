@@ -16,7 +16,7 @@ from core.database import get_db
 from models import Document, Workspace, User
 from schemas import DocumentResponse
 from services.file_storage import storage_service
-from services.ingestion import process_document, broadcast_status
+from services.ingestion import process_document_standalone, broadcast_status
 from core.chroma import get_workspace_collection
 from core.websocket import manager
 from api.deps import get_workspace, get_current_user
@@ -45,13 +45,28 @@ async def upload_document(
     if status != "READY":
         raise HTTPException(status_code=400, detail="Configure AI Provider before uploading documents.")
 
-    # Save physical file to ./uploads
-    file_path = await storage_service.save_upload_file(file)
+    # Validate file extension
+    ALLOWED_EXTENSIONS = {"PDF", "TXT", "MD", "DOCX"}
+    ext = file.filename.split(".")[-1].upper() if "." in file.filename else "unknown"
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format: .{ext.lower()}. Supported formats: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
 
-    # Calculate file size
+    # Validate file size (max 25MB)
+    MAX_FILE_SIZE = 25 * 1024 * 1024
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum limit of 25MB. Uploaded: {file_size / (1024 * 1024):.2f}MB"
+        )
+
+    # Save physical file to ./uploads
+    file_path = await storage_service.save_upload_file(file)
 
     # Calculate content hash (SHA-256)
     hasher = hashlib.sha256()
@@ -60,9 +75,6 @@ async def upload_document(
         hasher.update(chunk)
     content_hash = hasher.hexdigest()
     file.file.seek(0)
-
-    # Extract file extension for type
-    ext = file.filename.split(".")[-1].upper() if "." in file.filename else "unknown"
 
     document = Document(
         workspace_id=workspace.id,
@@ -82,8 +94,9 @@ async def upload_document(
     # Broadcast initial "uploading" status
     await broadcast_status(document, db)
 
-    # Enqueue ingestion background task (which will transition status: uploading -> processing -> ready/error)
-    background_tasks.add_task(process_document, document.id, db, ocr)
+    # NOTE: process_document_standalone creates its own DB session to avoid
+    # holding connections open while waiting for the sequential ingestion lock
+    background_tasks.add_task(process_document_standalone, document.id, ocr)
 
     return document
 
@@ -117,8 +130,9 @@ async def reprocess_document(
     from api.deps import get_workspace_member
     await get_workspace_member(document.workspace_id, current_user, db)
 
-    # Enqueue ingestion background task again
-    background_tasks.add_task(process_document, document.id, db, ocr)
+    # NOTE: process_document_standalone creates its own DB session to avoid
+    # holding connections open while waiting for the sequential ingestion lock
+    background_tasks.add_task(process_document_standalone, document.id, ocr)
 
     return {"message": "Document re-processing started"}
 

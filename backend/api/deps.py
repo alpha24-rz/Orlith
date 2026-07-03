@@ -24,10 +24,27 @@ async def get_current_user(
                 user = result.scalars().first()
                 if user:
                     return user
-        except Exception:
-            pass
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except (JWTError, Exception):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-    # Fallback to test/default user
+    # If no token is provided, enforce auth in production
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Fallback to test/default user in dev/test environment
     result = await db.execute(select(User))
     user = result.scalars().first()
     if user is None:

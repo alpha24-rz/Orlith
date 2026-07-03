@@ -9,10 +9,22 @@ from services.ai.gateway import LLMGateway
 from services.query_rewriter import rewrite_query
 import time
 import asyncio
+import re
 from services.ai.retrieval.config import RetrievalConfig
 from services.ai.retrieval.reranker import execute_rerank
 
 logger = logging.getLogger(__name__)
+
+def normalize_filename(filename: str) -> str:
+    if not filename:
+        return ""
+    # Strip extension
+    base = filename.rsplit(".", 1)[0]
+    # Strip patterns like -v11, _v4, v2, -version-3, etc.
+    base = re.sub(r'[-_\s]+v\d+$', '', base, flags=re.IGNORECASE)
+    base = re.sub(r'[-_\s]+version[-_\s]*\d+$', '', base, flags=re.IGNORECASE)
+    base = re.sub(r'\s*\(\d+\)$', '', base)
+    return base.lower().strip()
 
 async def retrieve(
     workspace: Workspace,
@@ -202,7 +214,20 @@ async def retrieve_relevant_chunks(
             logger.warning(f"Reranking failed: {e}. Falling back to ChromaDB/RRF distance.")
             fallback_used = True
     
-    reranked = reranked[:final_top_k]
+    # Group and deduplicate by (normalized_filename, page) to filter out duplicate versions
+    deduped_reranked = []
+    seen_pages = set()
+    for chunk in reranked:
+        meta = chunk.get("meta") or {}
+        filename = meta.get("filename", "")
+        page = meta.get("page_number", 1)
+        norm_name = normalize_filename(filename)
+        key = (norm_name, page)
+        if key not in seen_pages:
+            seen_pages.add(key)
+            deduped_reranked.append(chunk)
+    
+    reranked = deduped_reranked[:final_top_k]
     t4 = time.time()
     
     logger.info(

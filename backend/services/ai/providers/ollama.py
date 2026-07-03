@@ -95,8 +95,25 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
             return False
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
-        # Ollama /api/embeddings requires a single prompt string, but later versions
-        # might support batch /api/embed. For simplicity, we loop if texts > 1.
+        # Try batch embedding via modern /api/embed first
+        try:
+            payload = {
+                "model": model,
+                "input": texts
+            }
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    f"{self.base_url}/api/embed",
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if "embeddings" in data:
+                        return data["embeddings"]
+        except Exception as e:
+            logger.warning(f"Ollama batch /api/embed failed: {e}. Falling back to sequential /api/embeddings...")
+
+        # Fallback to sequential /api/embeddings for older Ollama versions
         embeddings = []
         async with httpx.AsyncClient(timeout=60) as client:
             for text in texts:

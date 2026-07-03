@@ -84,7 +84,7 @@ async def test_model_registry_openrouter_and_error_handling():
 
             # Check that httpx.AsyncClient.get was called with correct URL and headers for OpenRouter
             calls = mock_get.call_args_list
-            assert len(calls) == 2
+            assert len(calls) == 1
             
             or_call = next(c for c in calls if "openrouter.ai" in c[0][0])
             called_url = or_call[0][0]

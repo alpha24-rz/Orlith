@@ -974,15 +974,20 @@ function ChatPageInner() {
 
   const fetchModels = useCallback(async () => {
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/models');
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const res = await fetch('/api/providers/models', { headers });
       if (res.ok) {
-        const json = await res.json();
-        const fetchedModels: ModelInfo[] = json.data.map((m: any) => ({
+        const data = await res.json();
+        const fetchedModels: ModelInfo[] = data.map((m: any) => ({
           id: m.id,
-          name: m.name || m.id,
-          endpoint_id: 'openrouter',
-          endpoint_name: 'OpenRouter',
-          provider_label: 'OpenRouter'
+          name: m.display_name || m.id,
+          endpoint_id: m.provider,
+          endpoint_name: m.provider === 'gemini' ? 'Google Gemini' : m.provider.charAt(0).toUpperCase() + m.provider.slice(1),
+          provider_label: m.provider === 'gemini' ? 'Google Gemini' : m.provider.charAt(0).toUpperCase() + m.provider.slice(1)
         }));
 
         // Sort alphabetically
@@ -991,22 +996,22 @@ function ChatPageInner() {
         setModels(fetchedModels);
         const savedModelId = localStorage.getItem('documind_preferred_model');
         const defaultModel = (savedModelId && fetchedModels.find(m => m.id === savedModelId))
-          || fetchedModels.find(m => m.id === 'deepseek/deepseek-v3.2-exp')
+          || fetchedModels.find(m => m.id === 'gemini-1.5-flash')
           || fetchedModels[0];
         setSelectedModel(defaultModel);
         return;
       }
     } catch (err) {
-      console.error("Failed to fetch models from OpenRouter", err);
+      console.error("Failed to fetch models from backend", err);
     }
 
     // Fallback if network request fails
     const fallbackModel = {
-      id: 'deepseek/deepseek-v3.2-exp',
-      name: 'DeepSeek V3.2 Exp',
-      endpoint_id: 'openrouter',
-      endpoint_name: 'OpenRouter',
-      provider_label: 'OpenRouter'
+      id: 'gemini-1.5-flash',
+      name: 'Gemini 1.5 Flash',
+      endpoint_id: 'gemini',
+      endpoint_name: 'Google Gemini',
+      provider_label: 'Google Gemini'
     } as ModelInfo;
     setModels([fallbackModel]);
 
@@ -1015,9 +1020,9 @@ function ChatPageInner() {
       setSelectedModel({
         id: savedModelId,
         name: savedModelId,
-        endpoint_id: 'openrouter',
-        endpoint_name: 'OpenRouter',
-        provider_label: 'OpenRouter'
+        endpoint_id: 'gemini',
+        endpoint_name: 'Google Gemini',
+        provider_label: 'Google Gemini'
       });
     } else {
       setSelectedModel(fallbackModel);
@@ -1191,6 +1196,7 @@ function ChatPageInner() {
                   if (parsed.meta.conversation_id) {
                     if (!currentConvId) {
                       setActiveConversationId(parsed.meta.conversation_id)
+                      window.history.replaceState(null, '', `/dashboard/chat?id=${parsed.meta.conversation_id}`)
                     }
                   }
                 }
@@ -1345,6 +1351,7 @@ function ChatPageInner() {
                 setAgentSteps([])
                 if (evt.conversation_id && !currentConvId) {
                   setActiveConversationId(evt.conversation_id)
+                  window.history.replaceState(null, '', `/dashboard/chat?id=${evt.conversation_id}`)
                 }
               } else if (event === 'answer') {
                 accumulatedAnswer += evt.text || ''

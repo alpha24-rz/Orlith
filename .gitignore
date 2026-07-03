@@ -63,3 +63,6 @@ tunnel.html
 
 # Cloned Hugging Face Space repositories
 orlith-ai/
+
+# Large model files
+*.safetensors

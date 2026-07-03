@@ -176,11 +176,22 @@ export default function SettingsPage() {
       if (activeTab === 'workspace') {
         await updateWorkspace(activeWorkspace.id, { name: wsName })
       } else if (activeTab === 'ai') {
+        // Enforce single active API key constraint: sync embedding provider to LLM provider
+        let embedModel = 'default'
+        if (defaultChatEndpointId === 'gemini') {
+          embedModel = 'models/gemini-embedding-001'
+        } else if (defaultChatEndpointId === 'openai') {
+          embedModel = 'text-embedding-3-small'
+        } else if (defaultChatEndpointId === 'openrouter') {
+          embedModel = 'openrouter/nvidia/llama-nemotron-embed-vl-1b-v2:free'
+        } else if (defaultChatEndpointId === 'ollama') {
+          embedModel = 'nomic-embed-text'
+        }
         await updateAiSettings(activeWorkspace.id, {
           active_llm_provider: defaultChatEndpointId,
           active_llm_model: defaultChatModel,
-          active_embedding_provider: defaultEmbeddingEndpointId,
-          active_embedding_model: defaultEmbeddingModel
+          active_embedding_provider: defaultChatEndpointId,
+          active_embedding_model: embedModel
         })
       }
       setSaved(true)
@@ -552,49 +563,51 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Embeddings */}
-      <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
-        <h3 className="text-sm font-bold mb-1">Embedding Provider</h3>
-        <p className="text-xs text-text-muted mb-4">Used for vector indexing and semantic search.</p>
-        
-        {endpoints.length === 0 ? (
-          <div className="text-xs text-text-muted">Configure an endpoint first.</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-            {endpoints.map(e => (
-              <button
-                key={e.id}
-                onClick={() => setDefaultEmbeddingEndpointId(e.id)}
-                className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                  defaultEmbeddingEndpointId === e.id
-                    ? 'border-indigo-500/50 bg-indigo-600/10'
-                    : 'border-border-strong hover:border-border-strong hover:bg-bg-hover'
-                }`}
-              >
-                <div className={`w-3 h-3 rounded-full border-2 shrink-0 transition-all ${
-                  defaultEmbeddingEndpointId === e.id ? 'border-indigo-500 bg-indigo-500' : 'border-border-strong'
-                }`} />
-                <span className="text-xs font-medium flex-1">{e.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        
-        {/* Model selection */}
-        {defaultEmbeddingEndpointId && (
-          <div className="mt-4 border-t border-border-subtle pt-4">
-            <h4 className="text-xs font-bold mb-3 text-text-subtle">Embedding Model</h4>
-            <div className="text-xs text-text-muted mb-2">Type the exact ID of the embedding model you wish to use (e.g. text-embedding-3-small, nomic-embed-text)</div>
-            <input
-              type="text"
-              value={defaultEmbeddingModel}
-              onChange={(e) => setDefaultEmbeddingModel(e.target.value)}
-              placeholder="e.g. text-embedding-3-small"
-              className="w-full px-3 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-sm text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
-            />
-          </div>
-        )}
-      </div>
+      {/* Embeddings selection hidden to enforce single active key constraint */}
+      {false && (
+        <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
+          <h3 className="text-sm font-bold mb-1">Embedding Provider</h3>
+          <p className="text-xs text-text-muted mb-4">Used for vector indexing and semantic search.</p>
+          
+          {endpoints.length === 0 ? (
+            <div className="text-xs text-text-muted">Configure an endpoint first.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+              {endpoints.map(e => (
+                <button
+                  key={e.id}
+                  onClick={() => setDefaultEmbeddingEndpointId(e.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                    defaultEmbeddingEndpointId === e.id
+                      ? 'border-indigo-500/50 bg-indigo-600/10'
+                      : 'border-border-strong hover:border-border-strong hover:bg-bg-hover'
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded-full border-2 shrink-0 transition-all ${
+                    defaultEmbeddingEndpointId === e.id ? 'border-indigo-500 bg-indigo-500' : 'border-border-strong'
+                  }`} />
+                  <span className="text-xs font-medium flex-1">{e.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {/* Model selection */}
+          {defaultEmbeddingEndpointId && (
+            <div className="mt-4 border-t border-border-subtle pt-4">
+              <h4 className="text-xs font-bold mb-3 text-text-subtle">Embedding Model</h4>
+              <div className="text-xs text-text-muted mb-2">Type the exact ID of the embedding model you wish to use (e.g. text-embedding-3-small, nomic-embed-text)</div>
+              <input
+                type="text"
+                value={defaultEmbeddingModel}
+                onChange={(e) => setDefaultEmbeddingModel(e.target.value)}
+                placeholder="e.g. text-embedding-3-small"
+                className="w-full px-3 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-sm text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Model routing */}
       <div className="rounded-2xl border border-border-strong bg-bg-input p-5">

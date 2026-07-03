@@ -1,9 +1,9 @@
-from .base import ILLMProvider
+from .base import ILLMProvider, IEmbeddingProvider
 from typing import AsyncIterator
 import httpx
 import json
 
-class GeminiProvider(ILLMProvider):
+class GeminiProvider(ILLMProvider, IEmbeddingProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
         # Use Gemini's OpenAI-compatible endpoint
@@ -88,3 +88,27 @@ class GeminiProvider(ILLMProvider):
                 return resp.status_code == 200
         except Exception:
             return False
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        # Map models/gemini-embedding-001 or other models to text-embedding-004
+        # which is supported in the OpenAI compatibility endpoint
+        embedding_model = model
+        if not embedding_model or embedding_model == "default" or "gemini-embedding-001" in embedding_model:
+            embedding_model = "text-embedding-004"
+        else:
+            embedding_model = embedding_model.replace("models/", "")
+
+        payload = {
+            "model": embedding_model,
+            "input": texts,
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{self.base_url}/embeddings",
+                json=payload,
+                headers=self.headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()["data"]
+            data.sort(key=lambda x: x["index"])
+            return [item["embedding"] for item in data]

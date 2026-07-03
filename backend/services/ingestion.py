@@ -10,12 +10,27 @@ import os
 import hashlib
 import pdfplumber
 import docx
-import pytesseract
 import pypdfium2 as pdfium
 from PIL import Image
 import logging
+import easyocr
+import numpy as np
+import asyncio
+import torch
 
 logger = logging.getLogger(__name__)
+
+_ingestion_lock = asyncio.Lock()
+
+_easyocr_reader = None
+
+def get_easyocr_reader():
+    global _easyocr_reader
+    if _easyocr_reader is None:
+        cuda_available = torch.cuda.is_available()
+        logger.info(f"Initializing EasyOCR reader (en, id) on {'GPU (CUDA)' if cuda_available else 'CPU'}...")
+        _easyocr_reader = easyocr.Reader(['en', 'id'], gpu=cuda_available)
+    return _easyocr_reader
 
 
 def get_file_hash(file_path: str) -> str:
@@ -124,13 +139,6 @@ def extract_text_from_file(
             logger.info(
                 "PDF has very little text or OCR was explicitly requested. Attempting OCR..."
             )
-            import shutil
-
-            if not shutil.which("tesseract"):
-                raise RuntimeError(
-                    "Tesseract OCR binary not found on the system. "
-                    "Please install it (e.g. 'sudo apt-get install tesseract-ocr') to enable OCR processing."
-                )
 
             try:
                 pages_data.clear()  # clear whatever we got from pdfplumber
@@ -138,9 +146,13 @@ def extract_text_from_file(
                 page_count = len(pdf_doc)
                 metadata["page_count"] = page_count
 
+                reader = get_easyocr_reader()
+
                 for i, page in enumerate(pdf_doc):
                     image = page.render(scale=2).to_pil()
-                    page_text = pytesseract.image_to_string(image)
+                    image_np = np.array(image)
+                    results = reader.readtext(image_np, detail=0)
+                    page_text = "\n".join(results)
                     if page_text:
                         pages_data.append({"text": page_text, "page_number": i + 1})
 
@@ -242,7 +254,7 @@ async def embed_document(
     collection = get_workspace_collection(document.workspace_id)
     # Check if there are existing embeddings for this document (e.g., in a re-embed scenario)
     try:
-        collection.delete(where={"document_id": document.id})
+        await asyncio.to_thread(collection.delete, where={"document_id": document.id})
     except Exception:
         pass  # Ignore if not found
 
@@ -260,7 +272,8 @@ async def embed_document(
         }
         for c in chunks
     ]
-    collection.add(
+    await asyncio.to_thread(
+        collection.add,
         ids=ids, embeddings=embeddings, metadatas=metadatas, documents=texts_to_embed
     )
 
@@ -293,6 +306,30 @@ async def embed_document(
     await db.commit()
 
 
+async def process_document_standalone(document_id: str, ocr: bool = False):
+    """
+    Standalone background task entry point.
+    Acquires the sequential ingestion lock BEFORE opening a database connection
+    to prevent connection pool starvation.
+    """
+    # 1. Update status to "processing" immediately so the UI shows it as processing
+    from core.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            document = await db.get(Document, document_id)
+            if document and document.status == "uploading":
+                document.status = "processing"
+                await db.commit()
+                await broadcast_status(document, db)
+    except Exception as e:
+        logger.warning(f"Could not set initial processing status for document {document_id}: {e}")
+
+    # 2. Acquire sequential ingestion lock and run the heavy ingestion process
+    async with _ingestion_lock:
+        async with AsyncSessionLocal() as db:
+            await process_document(document_id, db, ocr)
+
+
 async def process_document(document_id: str, db: AsyncSession, ocr: bool = False):
     """Background task to extract, chunk, embed, and store a document."""
     document = await db.get(Document, document_id)
@@ -300,10 +337,12 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
         logger.error(f"Ingestion failed: Document {document_id} not found in database.")
         return
 
-    document.status = "processing"
-    await db.commit()
-    await db.refresh(document)
-    await broadcast_status(document, db)
+    # Ensure status is committed as processing
+    if document.status != "processing":
+        document.status = "processing"
+        await db.commit()
+        await db.refresh(document)
+        await broadcast_status(document, db)
 
     try:
         workspace = await db.get(Workspace, document.workspace_id)
@@ -313,15 +352,25 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
         from services.ai.gateway import LLMGateway
         gateway = LLMGateway(db)
         embedding_provider, model_name = await gateway.get_embedding_provider(workspace)
-        provider_name = "openrouter"
+        
+        # Determine provider name dynamically
+        if settings.EMBEDDING_PROVIDER == "huggingface":
+            provider_name = "huggingface"
+        elif workspace and getattr(workspace, "active_embedding_provider", None):
+            provider_name = workspace.active_embedding_provider
+        elif settings.GEMINI_API_KEY:
+            provider_name = "gemini"
+        else:
+            provider_name = "openrouter"
 
         # Update content hash
         if not document.content_hash:
             document.content_hash = get_file_hash(document.file_path)
 
-        # Extract text (now per page)
-        pages_data, meta = extract_text_from_file(
-            document.file_path, document.file_type, ocr=ocr
+        # Extract text (now per page) - CPU bound so run in thread pool
+        pages_data, meta = await asyncio.to_thread(
+            extract_text_from_file,
+            document.file_path, document.file_type, ocr
         )
 
         # Setup splitter
@@ -331,7 +380,7 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
         )
         
         chunks = []
-        if not is_markdown:
+        if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
             try:
                 from services.chunking import SemanticSimilaritySplitter
                 logger.info(f"Attempting semantic similarity chunking for {document.filename}")

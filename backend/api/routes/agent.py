@@ -23,6 +23,7 @@ class AgentRunRequest(BaseModel):
     # Maksimum tool call iterations sebelum berhenti
     max_iterations: Optional[int] = 8
     provider: Optional[str] = None
+    endpoint_id: Optional[str] = None
     model: Optional[str] = None
 
 
@@ -58,7 +59,7 @@ async def run_agent_endpoint(
             mode="agent",
             conversation_id=request.conversation_id,
             conversation_history=request.conversation_history or [],
-            override_endpoint_id=request.provider,
+            override_endpoint_id=request.endpoint_id or request.provider,
             override_model=request.model,
             max_iterations=min(request.max_iterations or 8, 12),
         ),
