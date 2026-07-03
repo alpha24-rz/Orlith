@@ -32,10 +32,16 @@ db_url = settings.DATABASE_URL
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
+# Disable prepared statement cache for PostgreSQL to avoid DuplicatePreparedStatement errors (especially with transaction poolers like PgBouncer)
+engine_args = {}
+if "postgresql" in db_url:
+    engine_args["prepared_statement_cache_size"] = 0
+
 engine = create_async_engine(
     db_url,
     echo=False,
     connect_args=connect_args,
+    **engine_args
 )
 
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
