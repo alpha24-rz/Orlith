@@ -41,7 +41,15 @@ class StandardChatMode(BaseReasoningMode):
             yield "data: [DONE]\n\n"
             return
 
-        if not conversation_id or conversation_id.startswith("temp_"):
+        # Check if conversation exists in DB
+        conversation_exists = False
+        if conversation_id and not conversation_id.startswith("temp_"):
+            from sqlalchemy import select
+            stmt = select(Conversation).where(Conversation.id == conversation_id)
+            res = await self.db.execute(stmt)
+            conversation_exists = res.scalar_one_or_none() is not None
+
+        if not conversation_id or conversation_id.startswith("temp_") or not conversation_exists:
             title = query[:40] + "..." if len(query) > 40 else query
             conversation = Conversation(workspace_id=workspace_id, title=title)
             self.db.add(conversation)
