@@ -61,3 +61,22 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/demo", response_model=Token)
+async def login_demo(db: AsyncSession = Depends(get_db)):
+    # Find or create a demo user
+    result = await db.execute(select(User).where(User.email == "demo@example.com"))
+    user = result.scalars().first()
+    if not user:
+        user = User(
+            email="demo@example.com",
+            username="Demo User",
+            hashed_password=get_password_hash("demopassword123")
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer", "user": user}

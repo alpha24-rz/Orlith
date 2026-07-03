@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, EyeOff, ArrowRight } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, User } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -33,6 +33,26 @@ export default function AuthPage() {
   useEffect(() => {
     setTheme("dark")
   }, [setTheme])
+
+  const handleDemoAccess = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await axiosClient.post('/auth/demo')
+      const { access_token, user } = res.data
+      setAuth(access_token, user)
+      router.push('/dashboard')
+    } catch (err: any) {
+      console.error(err)
+      setError(
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        'Failed to access as Guest. Please try again.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const slides = [
     {
@@ -413,9 +433,14 @@ export default function AuthPage() {
               </svg>
               <span className="text-text-subtle group-hover:text-foreground transition-colors duration-300">Google</span>
             </button>
-            <button type="button" className="flex items-center justify-center gap-2 bg-bg-input border border-border-strong hover:border-border-subtle hover:bg-bg-hover text-foreground text-sm py-2.5 rounded-xl transition-all duration-300 group hover:scale-[1.02] active:scale-100">
-              <svg className="w-5" fill="currentColor" viewBox="0 0 24.00 24.00" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0" transform="translate(0.2400000000000002,0.2400000000000002), scale(0.98)"><rect x="0" y="0" width="24.00" height="24.00" rx="12" fill="transparent" strokeWidth="0"></rect></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M22,12.247a10,10,0,0,1-6.833,9.488c-.507.1-.687-.214-.687-.481,0-.328.012-1.407.012-2.743a2.386,2.386,0,0,0-.679-1.852c2.228-.248,4.566-1.093,4.566-4.935a3.859,3.859,0,0,0-1.028-2.683,3.591,3.591,0,0,0-.1-2.647s-.838-.269-2.747,1.025a9.495,9.495,0,0,0-5.007,0c-1.91-1.294-2.75-1.025-2.75-1.025a3.6,3.6,0,0,0-.1,2.647A3.864,3.864,0,0,0,5.62,11.724c0,3.832,2.334,4.69,4.555,4.942A2.137,2.137,0,0,0,9.54,18a2.128,2.128,0,0,1-2.91-.831A2.1,2.1,0,0,0,5.1,16.142s-.977-.013-.069.608A2.646,2.646,0,0,1,6.14,18.213s.586,1.944,3.368,1.34c.005.835.014,1.463.014,1.7,0,.265-.183.574-.683.482A10,10,0,1,1,22,12.247Z"></path></g></svg>
-              <span className="text-text-subtle group-hover:text-foreground transition-colors duration-300">GitHub</span>
+            <button
+              type="button"
+              onClick={handleDemoAccess}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 bg-bg-input border border-border-strong hover:border-purple-500/50 hover:bg-purple-500/5 text-foreground text-sm py-2.5 rounded-xl transition-all duration-300 group hover:scale-[1.02] active:scale-100 disabled:opacity-50"
+            >
+              <User className="w-4 h-4 text-purple-400 transition-transform duration-300 group-hover:scale-110" />
+              <span className="text-text-subtle group-hover:text-foreground transition-colors duration-300">Akses Tanpa Login</span>
             </button>
           </div>
         </div>
