@@ -279,7 +279,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-hover transition-colors text-left min-w-0"
           title={isCollapsed ? displayEmail : undefined}
         >
-          <div className="relative w-7 h-7 rounded-full shrink-0 bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-300">
+          <div className="relative w-7 h-7 rounded-full shrink-0 bg-indigo-100 dark:bg-indigo-600/30 border border-indigo-300 dark:border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300">
             {displayAvatar}
             {unreadCount > 0 && (
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 border border-bg-sidebar animate-pulse" />

@@ -417,7 +417,7 @@ export default function SettingsPage() {
           return (
             <div key={m.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 px-5 py-3.5 ${i < members.length - 1 ? 'border-b border-border-subtle' : ''}`}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center text-sm font-bold text-indigo-300 shrink-0">
+                <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-600/20 border border-indigo-300 dark:border-indigo-500/20 flex items-center justify-center text-sm font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
                   {m.avatar}
                 </div>
                 <div className="flex-1 min-w-0">

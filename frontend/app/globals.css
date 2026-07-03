@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F0F8FF;
-  --foreground: #1E293B;
+  --background: #f9f9f7;
+  --foreground: #1A1A17;
 
-  --bg-sidebar: #E6F0FA;
-  --bg-panel: #FFFFFF;
-  --bg-hover: #E1EDFA;
-  --bg-input: #F7FAFC;
+  --bg-sidebar: #f4f3ef;
+  --bg-panel: #ffffff;
+  --bg-hover: #efeee8;
+  --bg-input: #efeee8;
 
-  --border-subtle: #E2ECF8;
-  --border-strong: #C6D8E8;
+  --border-subtle: #eae8e0;
+  --border-strong: #e5e3d9;
 
-  --text-muted: #64748B;
-  --text-subtle: #475569;
+  --text-muted: #6B6A65;
+  --text-subtle: #3D3C38;
 
-  --scrollbar-thumb: rgba(70, 130, 180, 0.2);
-  --scrollbar-thumb-hover: rgba(70, 130, 180, 0.4);
+  --scrollbar-thumb: rgba(139, 137, 130, 0.2);
+  --scrollbar-thumb-hover: rgba(139, 137, 130, 0.4);
 }
 
 .dark {
