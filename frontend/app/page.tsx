@@ -41,7 +41,7 @@ export default function AuthPage() {
       const res = await axiosClient.post('/auth/demo')
       const { access_token, user } = res.data
       setAuth(access_token, user)
-      router.push('/dashboard')
+      router.push('/dashboard/chat')
     } catch (err: any) {
       console.error(err)
       setError(
@@ -124,7 +124,7 @@ export default function AuthPage() {
 
         const { access_token, user } = res.data
         setAuth(access_token, user)
-        router.push('/dashboard')
+        router.push('/dashboard/chat')
       }
     } catch (err: any) {
       console.error(err)

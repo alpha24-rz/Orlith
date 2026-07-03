@@ -58,7 +58,7 @@ export default function RegisterPage() {
       setAuth(access_token, user)
 
       // 3. Redirect to dashboard
-      router.push('/dashboard')
+      router.push('/dashboard/chat')
     } catch (err: any) {
       console.error(err)
       setError(
