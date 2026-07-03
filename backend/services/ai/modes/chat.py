@@ -41,7 +41,7 @@ class StandardChatMode(BaseReasoningMode):
             yield "data: [DONE]\n\n"
             return
 
-        if not conversation_id:
+        if not conversation_id or conversation_id.startswith("temp_"):
             title = query[:40] + "..." if len(query) > 40 else query
             conversation = Conversation(workspace_id=workspace_id, title=title)
             self.db.add(conversation)
