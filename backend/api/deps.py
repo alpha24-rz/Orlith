@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Cookie, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,11 +13,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
 async def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+    token: Optional[str] = Depends(oauth2_scheme),
+    token_cookie: Optional[str] = Cookie(None, alias="token"),
+    token_query: Optional[str] = Query(None, alias="token"),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    if token:
+    actual_token = token or token_cookie or token_query
+    if actual_token:
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(actual_token, settings.SECRET_KEY, algorithms=[ALGORITHM])
             email: str = payload.get("sub")
             if email:
                 result = await db.execute(select(User).where(User.email == email))
@@ -58,6 +62,7 @@ async def get_current_user(
         await db.commit()
         await db.refresh(user)
     return user
+
 
 
 async def get_workspace(

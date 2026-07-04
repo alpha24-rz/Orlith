@@ -993,6 +993,7 @@ function ChatPageInner() {
   const { activeWorkspace, updateAiSettings } = useWorkspaceStore()
   const { conversations, fetchConversations, addConversation } = useChatStore()
   const user = useAuthStore(state => state.user)
+  const token = useAuthStore(state => state.token)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(chatId)
   const [input, setInput] = useState('')
@@ -2145,7 +2146,7 @@ function ChatPageInner() {
                 <span className="text-xs font-bold text-foreground truncate max-w-[100px] sm:max-w-md">{viewerDoc.name}</span>
                 <span className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded shrink-0">p. {viewerDoc.page}</span>
                 <a
-                  href={`/api/documents/${viewerDoc.id}/download#page=${viewerDoc.page}`}
+                  href={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded bg-[#2A2A3A] border border-border-subtle hover:border-indigo-500/40 hover:bg-indigo-600/5 text-[10px] text-indigo-400 hover:text-indigo-300 transition-all font-semibold shrink-0"
@@ -2188,7 +2189,7 @@ function ChatPageInner() {
                     💡 Tips: Jika PDF tidak tampil sempurna, gunakan tombol <strong>"Buka di Tab Baru"</strong> di atas.
                   </div>
                   <iframe
-                    src={`/api/documents/${viewerDoc.id}/download#page=${viewerDoc.page}`}
+                    src={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
                     className="flex-1 w-full border-none"
                     title={viewerDoc.name}
                   />
