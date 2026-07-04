@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   const { pathname } = request.nextUrl
 
@@ -13,7 +13,7 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // 2. Redirect logged-in users away from auth pages
+  // 2. Redirect logged-in users away from auth pages to /dashboard/chat directly
   if (
     pathname === '/' ||
     pathname.startsWith('/login') ||
@@ -21,9 +21,15 @@ export function proxy(request: NextRequest) {
     pathname.startsWith('/signup')
   ) {
     if (token) {
-      const dashboardUrl = new URL('/dashboard', request.url)
+      const dashboardUrl = new URL('/dashboard/chat', request.url)
       return NextResponse.redirect(dashboardUrl)
     }
+  }
+
+  // 3. Redirect direct /dashboard requests to /dashboard/chat
+  if (pathname === '/dashboard') {
+    const chatUrl = new URL('/dashboard/chat', request.url)
+    return NextResponse.redirect(chatUrl)
   }
 
   return NextResponse.next()

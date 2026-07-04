@@ -29,7 +29,7 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setTimeout(() => {
-      window.location.href = '/dashboard'
+      window.location.href = '/dashboard/chat'
     }, 1000)
   }
 
