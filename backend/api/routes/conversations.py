@@ -62,3 +62,41 @@ async def delete_conversation(
     await db.commit()
     return {"message": "Conversation deleted"}
 
+
+@router.delete("/{conversation_id}/messages/{message_id}")
+async def delete_messages_from(
+    conversation_id: str,
+    message_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalars().first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    await get_workspace_member(conversation.workspace_id, current_user, db)
+    
+    msg_result = await db.execute(
+        select(Message)
+        .where(Message.id == message_id, Message.conversation_id == conversation_id)
+    )
+    target_message = msg_result.scalars().first()
+    if not target_message:
+        raise HTTPException(status_code=404, detail="Message not found")
+        
+    from sqlalchemy import delete
+    delete_stmt = (
+        delete(Message)
+        .where(Message.conversation_id == conversation_id)
+        .where(Message.created_at >= target_message.created_at)
+    )
+    await db.execute(delete_stmt)
+    await db.commit()
+    
+    return {"message": "Messages deleted"}
+
+

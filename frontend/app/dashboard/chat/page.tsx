@@ -13,7 +13,8 @@ import {
   ChevronDown, Sparkles, Clock, RotateCcw, X, Zap,
   MessageSquare, ChevronRight, Info, Search, Star,
   Bot, Wrench, CheckCircle2, AlertCircle, Loader2, ChevronUp, Database,
-  FlaskConical, BookOpen, ListTree, Layers, Download, ExternalLink, ScrollText, Trash2, Check
+  FlaskConical, BookOpen, ListTree, Layers, Download, ExternalLink, ScrollText, Trash2, Check,
+  Pencil, RefreshCw
 } from 'lucide-react'
 import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -367,13 +368,26 @@ function processCitationsInNode(
 }
 
 
+interface ChatBubbleProps {
+  message: ChatMessage
+  onOpenDoc: (citation: Citation) => void
+  onEditSubmit?: (messageId: string, newContent: string) => void
+  onRegenerate?: (messageId: string) => void
+}
+
 // ─── Chat Bubble Component ────────────────────────────────────────────────────
-function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (citation: Citation) => void }) {
+function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubbleProps) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null)
   const citationPanelRef = useRef<HTMLDivElement>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(message.content)
+
+  useEffect(() => {
+    setEditContent(message.content)
+  }, [message.content])
 
   const copy = () => {
     navigator.clipboard.writeText(message.content)
@@ -404,10 +418,65 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
   }, [activeCitation])
 
   if (isUser) {
+    if (isEditing) {
+      return (
+        <div className="flex justify-end mb-4 animate-fade-in w-full">
+          <div className="w-full max-w-lg bg-bg-input border border-indigo-500/30 rounded-2xl p-4">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="w-full bg-transparent border-0 focus:ring-0 text-sm text-foreground leading-relaxed resize-none h-24 focus:outline-none"
+              placeholder="Edit pesan Anda..."
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditContent(message.content)
+                }}
+                className="px-3 py-1.5 rounded-lg border border-border-strong text-xs font-semibold text-text-subtle hover:text-foreground hover:bg-bg-hover transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (editContent.trim() && editContent.trim() !== message.content) {
+                    onEditSubmit?.(message.id, editContent.trim())
+                  }
+                  setIsEditing(false)
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+              >
+                Simpan & Kirim
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
-      <div className="flex justify-end mb-4 animate-fade-in">
+      <div className="flex flex-col items-end mb-4 animate-fade-in group">
         <div className="max-w-lg bg-indigo-600/20 border border-indigo-500/20 rounded-2xl rounded-tr-sm px-4 py-3">
-          <p className="text-sm text-foreground leading-relaxed">{message.content}</p>
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={copy}
+            className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
+            title={copied ? 'Disalin!' : 'Salin'}
+          >
+            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          </button>
+          {onEditSubmit && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
+              title="Edit pesan"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     )
@@ -603,8 +672,17 @@ function ChatBubble({ message, onOpenDoc }: { message: ChatMessage; onOpenDoc: (
           <span className="text-[10px] text-text-muted">{formatRelativeTime(message.timestamp)}</span>
           <div className="flex items-center gap-1 ml-auto">
             <button onClick={copy} className="p-1 rounded text-text-muted hover:text-foreground transition-colors" title={copied ? 'Disalin!' : 'Salin'}>
-              <Copy className="w-3 h-3" />
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
             </button>
+            {onRegenerate && (
+              <button
+                onClick={() => onRegenerate(message.id)}
+                className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
+                title="Regenerasi respon"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            )}
             <button
               onClick={() => setFeedback('up')}
               className={`p-1 rounded transition-colors ${feedback === 'up' ? 'text-emerald-400' : 'text-text-muted hover:text-foreground'}`}
@@ -1096,16 +1174,17 @@ function ChatPageInner() {
 
   // Removed handleNewChat and deleteConversation as they are in SideBar now
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return
+  const sendMessage = async (overrideInput?: string, overrideHistory?: ChatMessage[]) => {
+    if (loading) return
+    const currentInput = overrideInput !== undefined ? overrideInput.trim() : input.trim()
+    if (!currentInput) return
 
     // Route ke agent mode jika aktif
     if (agentMode) {
-      await sendAgentMessage()
+      await sendAgentMessage(overrideInput, overrideHistory)
       return
     }
 
-    const currentInput = input.trim()
     const currentConvId = activeConversationId
 
     // Optimistic UI for new conversation
@@ -1124,13 +1203,14 @@ function ChatPageInner() {
       window.history.replaceState(null, '', `/dashboard/chat?id=${tempId}`)
     }
 
+    let finalConvId = currentConvId
     const userMsg: ChatMessage = {
       id: `msg_${Date.now().toString() + Math.random().toString(36).substring(2, 9)}_u`,
       role: 'user',
       content: currentInput,
       timestamp: new Date(),
     }
-    setMessages(p => [...p, userMsg])
+    setMessages(p => [...(overrideHistory || p), userMsg])
     setInput('')
     setLoading(true)
     setStreamingText('')
@@ -1151,7 +1231,7 @@ function ChatPageInner() {
           workspace_id: activeWorkspace?.id || '',
           message: currentInput,
           conversation_id: currentConvId,
-          conversation_history: messages.map(m => ({ role: m.role, content: m.content })),
+          conversation_history: (overrideHistory || messages).map(m => ({ role: m.role, content: m.content })),
           endpoint_id: selectedModel?.endpoint_id || null,
           model: selectedModel?.id || null,
         })
@@ -1194,6 +1274,7 @@ function ChatPageInner() {
                   if (parsed.meta.source_mode) sourceMode = parsed.meta.source_mode
                   if (parsed.meta.retrieval_score !== undefined) retrievalScore = parsed.meta.retrieval_score
                   if (parsed.meta.conversation_id) {
+                    finalConvId = parsed.meta.conversation_id
                     if (!currentConvId) {
                       setActiveConversationId(parsed.meta.conversation_id)
                       window.history.replaceState(null, '', `/dashboard/chat?id=${parsed.meta.conversation_id}`)
@@ -1233,13 +1314,42 @@ function ChatPageInner() {
       setStreamingText('')
       setLoading(false)
       if (activeWorkspace) fetchConversations(activeWorkspace.id)
+
+      const targetId = finalConvId || currentConvId
+      if (targetId && !targetId.startsWith('temp_')) {
+        try {
+          const headers: HeadersInit = {}
+          const token = localStorage.getItem('auth_token')
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
+          if (convRes.ok) {
+            const data = await convRes.json()
+            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.created_at),
+              citations: m.citations,
+              confidence: m.confidence,
+              model: m.model,
+              queriesUsed: m.metadata_json?.queriesUsed,
+              source_mode: m.metadata_json?.source_mode,
+              retrieval_score: m.metadata_json?.retrieval_score,
+            }))
+            setMessages(mappedMessages)
+          }
+        } catch (e) {
+          console.error("Failed to refresh messages", e)
+        }
+      }
     }
   }
 
   // ── Agent Mode Send ────────────────────────────────────────────────────────────
-  const sendAgentMessage = async () => {
-    if (!input.trim() || loading) return
-    const currentInput = input.trim()
+  const sendAgentMessage = async (overrideInput?: string, overrideHistory?: ChatMessage[]) => {
+    if (loading) return
+    const currentInput = overrideInput !== undefined ? overrideInput.trim() : input.trim()
+    if (!currentInput) return
 
     const currentConvId = activeConversationId
 
@@ -1258,13 +1368,14 @@ function ChatPageInner() {
       window.history.replaceState(null, '', `/dashboard/chat?id=${tempId}`)
     }
 
+    let finalConvId = currentConvId
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}_u`,
       role: 'user',
       content: currentInput,
       timestamp: new Date(),
     }
-    setMessages(p => [...p, userMsg])
+    setMessages(p => [...(overrideHistory || p), userMsg])
     setInput('')
     setLoading(true)
     setAgentRunning(true)
@@ -1287,7 +1398,7 @@ function ChatPageInner() {
           workspace_id: activeWorkspace?.id || '',
           message: currentInput,
           conversation_id: currentConvId,
-          conversation_history: messages.map(m => ({ role: m.role, content: m.content })),
+          conversation_history: (overrideHistory || messages).map(m => ({ role: m.role, content: m.content })),
           max_iterations: 8,
           endpoint_id: selectedModel?.endpoint_id || null,
           model: selectedModel?.id || null,
@@ -1349,9 +1460,12 @@ function ChatPageInner() {
                   },
                 ])
                 setAgentSteps([])
-                if (evt.conversation_id && !currentConvId) {
-                  setActiveConversationId(evt.conversation_id)
-                  window.history.replaceState(null, '', `/dashboard/chat?id=${evt.conversation_id}`)
+                if (evt.conversation_id) {
+                  finalConvId = evt.conversation_id
+                  if (!currentConvId) {
+                    setActiveConversationId(evt.conversation_id)
+                    window.history.replaceState(null, '', `/dashboard/chat?id=${evt.conversation_id}`)
+                  }
                 }
               } else if (event === 'answer') {
                 accumulatedAnswer += evt.text || ''
@@ -1395,6 +1509,99 @@ function ChatPageInner() {
         setAgentStreamText('')
       }, 200)
       if (activeWorkspace) fetchConversations(activeWorkspace.id)
+
+      const targetId = finalConvId || currentConvId
+      if (targetId && !targetId.startsWith('temp_')) {
+        try {
+          const headers: HeadersInit = {}
+          const token = localStorage.getItem('auth_token')
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
+          if (convRes.ok) {
+            const data = await convRes.json()
+            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.created_at),
+              citations: m.citations,
+              confidence: m.confidence,
+              model: m.model,
+              queriesUsed: m.metadata_json?.queriesUsed,
+              source_mode: m.metadata_json?.source_mode,
+              retrieval_score: m.metadata_json?.retrieval_score,
+            }))
+            setMessages(mappedMessages)
+          }
+        } catch (e) {
+          console.error("Failed to refresh messages", e)
+        }
+      }
+    }
+  }
+
+  const handleEditSubmit = async (messageId: string, newContent: string) => {
+    const finalConvId = activeConversationId
+    if (!finalConvId || loading) return
+
+    const idx = messages.findIndex(m => m.id === messageId)
+    if (idx === -1) return
+
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`/api/conversations/${finalConvId}/messages/${messageId}`, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to delete message for edit')
+      }
+
+      const history = messages.slice(0, idx)
+      await sendMessage(newContent, history)
+    } catch (err) {
+      console.error(err)
+      setLoading(false)
+    }
+  }
+
+  const handleRegenerate = async (messageId: string) => {
+    const finalConvId = activeConversationId
+    if (!finalConvId || loading) return
+
+    const idx = messages.findIndex(m => m.id === messageId)
+    if (idx === -1) return
+
+    const userMsgIdx = idx - 1
+    if (userMsgIdx < 0 || messages[userMsgIdx].role !== 'user') return
+
+    const userMsg = messages[userMsgIdx]
+
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`/api/conversations/${finalConvId}/messages/${userMsg.id}`, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to delete message for regenerate')
+      }
+
+      const history = messages.slice(0, userMsgIdx)
+      await sendMessage(userMsg.content, history)
+    } catch (err) {
+      console.error(err)
+      setLoading(false)
     }
   }
 
@@ -1530,6 +1737,8 @@ function ChatPageInner() {
                     setViewerDoc({ id: citation.docId, name: citation.docName, page: citation.page, snippet: citation.snippet })
                     setViewerOpen(true)
                   }}
+                  onEditSubmit={handleEditSubmit}
+                  onRegenerate={handleRegenerate}
                 />
               ))}
               {/* Research Panel — tampil saat deep research aktif/selesai */}
@@ -1753,7 +1962,7 @@ function ChatPageInner() {
                 <span className="text-[10px] text-text-muted hidden md:inline">⏎ Send · ⇧⏎ New line</span>
                 <button
                   id="send-message-btn"
-                  onClick={sendMessage}
+                  onClick={() => sendMessage()}
                   disabled={!input.trim() || loading}
                   className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
                 >
