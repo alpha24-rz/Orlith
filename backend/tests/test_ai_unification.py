@@ -68,3 +68,31 @@ async def test_tool_registry():
     assert "get_document_metadata" in tool_names
     assert "get_document_content" in tool_names
     assert "semantic_search" in tool_names
+
+
+@pytest.mark.anyio
+async def test_provider_stream_generator_type():
+    import inspect
+    from providers.gemini import GeminiProvider
+    from providers.openai import OpenAIProvider
+    from providers.anthropic import AnthropicProvider
+    from providers.ollama import OllamaProvider
+
+    providers_list = [
+        GeminiProvider("dummy_key"),
+        OpenAIProvider("dummy_key"),
+        AnthropicProvider("dummy_key"),
+        OllamaProvider("http://localhost:11434")
+    ]
+    for provider in providers_list:
+        # Call stream_response without awaiting it
+        stream = provider.stream_response(
+            messages=[{"role": "user", "content": "hi"}],
+            model="dummy-model"
+        )
+        
+        # Verify it's not a coroutine
+        assert not inspect.iscoroutine(stream), f"{provider.__class__.__name__}.stream_response returned a coroutine"
+        # Verify it has __aiter__
+        assert hasattr(stream, "__aiter__"), f"{provider.__class__.__name__}.stream_response does not support async iteration"
+

@@ -55,25 +55,22 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         if max_tokens > 0:
             payload["options"]["num_predict"] = max_tokens
 
-        async def generate():
-            async with httpx.AsyncClient(timeout=60) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/api/chat",
-                    json=payload,
-                ) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if line:
-                            try:
-                                chunk = json.loads(line)
-                                content = chunk.get("message", {}).get("content", "")
-                                if content:
-                                    yield content
-                            except Exception:
-                                pass
-
-        return generate()
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json=payload,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if line:
+                        try:
+                            chunk = json.loads(line)
+                            content = chunk.get("message", {}).get("content", "")
+                            if content:
+                                yield content
+                        except Exception:
+                            pass
 
     async def get_available_models(self) -> list[str]:
         try:

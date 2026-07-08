@@ -65,27 +65,24 @@ class AnthropicProvider(ILLMProvider):
     ) -> AsyncIterator[str]:
         payload = self._build_payload(messages, model, temperature, max_tokens, stream=True)
 
-        async def generate():
-            async with httpx.AsyncClient(timeout=60) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/messages",
-                    json=payload,
-                    headers=self.headers,
-                ) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            try:
-                                chunk = json.loads(line[6:])
-                                if chunk.get("type") == "content_block_delta":
-                                    content = chunk.get("delta", {}).get("text", "")
-                                    if content:
-                                        yield content
-                            except Exception:
-                                pass
-
-        return generate()
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/messages",
+                json=payload,
+                headers=self.headers,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        try:
+                            chunk = json.loads(line[6:])
+                            if chunk.get("type") == "content_block_delta":
+                                content = chunk.get("delta", {}).get("text", "")
+                                if content:
+                                    yield content
+                        except Exception:
+                            pass
 
     async def get_available_models(self) -> list[str]:
         return [
