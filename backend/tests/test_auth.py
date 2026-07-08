@@ -71,3 +71,33 @@ async def test_auth_flow(client: AsyncClient):
     headers_invalid = {"Authorization": "Bearer invalid_token"}
     response = await client.get("/auth/me", headers=headers_invalid)
     assert response.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_demo_auth_by_ip(client: AsyncClient):
+    # 1. Call demo endpoint with IP 1
+    headers_ip1 = {"X-Forwarded-For": "1.1.1.1"}
+    response1 = await client.post("/auth/demo", headers=headers_ip1)
+    assert response1.status_code == 200
+    data1 = response1.json()
+    assert "access_token" in data1
+    email1 = data1["user"]["email"]
+    assert email1.startswith("demo_")
+
+    # 2. Call demo endpoint with IP 2
+    headers_ip2 = {"X-Forwarded-For": "2.2.2.2"}
+    response2 = await client.post("/auth/demo", headers=headers_ip2)
+    assert response2.status_code == 200
+    data2 = response2.json()
+    email2 = data2["user"]["email"]
+    assert email2.startswith("demo_")
+    
+    # 3. Verify that IP 1 and IP 2 got different demo users
+    assert email1 != email2
+
+    # 4. Call again with IP 1, it should retrieve the same user
+    response1_again = await client.post("/auth/demo", headers=headers_ip1)
+    assert response1_again.status_code == 200
+    data1_again = response1_again.json()
+    assert data1_again["user"]["email"] == email1
+

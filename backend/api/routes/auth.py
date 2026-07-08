@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db
@@ -64,15 +64,33 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/demo", response_model=Token)
-async def login_demo(db: AsyncSession = Depends(get_db)):
-    # Find or create a demo user
-    result = await db.execute(select(User).where(User.email == "demo@example.com"))
+async def login_demo(request: Request, db: AsyncSession = Depends(get_db)):
+    import hashlib
+
+    # Extract client IP address, checking standard proxy headers first
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        x_real_ip = request.headers.get("x-real-ip")
+        if x_real_ip:
+            client_ip = x_real_ip.strip()
+        else:
+            client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Create a stable, short hash of the IP address
+    ip_hash = hashlib.md5(client_ip.encode()).hexdigest()[:12]
+    demo_email = f"demo_{ip_hash}@example.com"
+    demo_username = f"Guest_{ip_hash}"
+
+    # Find or create a demo user specific to this IP hash
+    result = await db.execute(select(User).where(User.email == demo_email))
     user = result.scalars().first()
     if not user:
         user = User(
-            email="demo@example.com",
-            username="Demo User",
-            hashed_password=get_password_hash("demopassword123")
+            email=demo_email,
+            username=demo_username,
+            hashed_password=get_password_hash(f"demopassword_{ip_hash}")
         )
         db.add(user)
         await db.commit()
