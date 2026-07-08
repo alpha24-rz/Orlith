@@ -38,8 +38,7 @@ NATIVE_MODELS = {
         {"id": "claude-3-haiku-20240307", "display_name": "Claude 3 Haiku", "context_window": 200000},
     ],
     "gemini": [
-        {"id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "context_window": 2000000},
-        {"id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "context_window": 1000000},
+        {"id": "gemini-2.0-flash", "display_name": "Gemini 2.0 Flash", "context_window": 1000000},
         {"id": "gemini-1.5-pro", "display_name": "Gemini 1.5 Pro", "context_window": 2000000},
         {"id": "gemini-1.5-flash", "display_name": "Gemini 1.5 Flash", "context_window": 1000000},
     ]

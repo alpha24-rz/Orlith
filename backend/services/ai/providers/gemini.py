@@ -73,7 +73,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                             pass
 
     async def get_available_models(self) -> list[str]:
-        return ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        return ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
     async def validate_api_key(self) -> bool:
         try:
