@@ -61,9 +61,33 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Post-process relative paths to ensure they resolve relative to the project root
+_project_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
+
+# Resolve SQLite DATABASE_URL if it contains a relative path
+if settings.DATABASE_URL.startswith("sqlite+aiosqlite:///"):
+    db_path = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "")
+    if not os.path.isabs(db_path):
+        if db_path.startswith("./"):
+            db_path = db_path[2:]
+        settings.DATABASE_URL = f"sqlite+aiosqlite:///{os.path.abspath(os.path.join(_project_root, db_path))}"
+
+# Resolve CHROMA_PERSIST_DIR if it's relative
+if not os.path.isabs(settings.CHROMA_PERSIST_DIR):
+    if settings.CHROMA_PERSIST_DIR.startswith("./"):
+        settings.CHROMA_PERSIST_DIR = settings.CHROMA_PERSIST_DIR[2:]
+    settings.CHROMA_PERSIST_DIR = os.path.abspath(os.path.join(_project_root, settings.CHROMA_PERSIST_DIR))
+
+# Resolve STORAGE_LOCAL_PATH if it's relative
+if not os.path.isabs(settings.STORAGE_LOCAL_PATH):
+    if settings.STORAGE_LOCAL_PATH.startswith("./"):
+        settings.STORAGE_LOCAL_PATH = settings.STORAGE_LOCAL_PATH[2:]
+    settings.STORAGE_LOCAL_PATH = os.path.abspath(os.path.join(_project_root, settings.STORAGE_LOCAL_PATH))
+
 # Ensure directories exist
 os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
 if settings.DATABASE_URL.startswith("sqlite"):
     db_dir = os.path.dirname(settings.DATABASE_URL.replace("sqlite+aiosqlite:///", ""))
     if db_dir and db_dir != ".":
         os.makedirs(db_dir, exist_ok=True)
+
