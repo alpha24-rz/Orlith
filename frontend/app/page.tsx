@@ -412,7 +412,11 @@ export default function AuthPage() {
             className={`grid grid-cols-2 gap-3 transition-all duration-500 delay-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}
           >
-            <button type="button" className="flex items-center justify-center gap-2 bg-bg-input border border-border-strong hover:border-border-subtle hover:bg-bg-hover text-foreground text-sm py-2.5 rounded-xl transition-all duration-300 group hover:scale-[1.02] active:scale-100">
+            <button
+              type="button"
+              onClick={() => setError("Google Sign-In is not implemented yet. Please use email/password or Access Without Login.")}
+              className="flex items-center justify-center gap-2 bg-bg-input border border-border-strong hover:border-border-subtle hover:bg-bg-hover text-foreground text-sm py-2.5 rounded-xl transition-all duration-300 group hover:scale-[1.02] active:scale-100"
+            >
               <svg className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
@@ -440,7 +444,7 @@ export default function AuthPage() {
               className="flex items-center justify-center gap-2 bg-bg-input border border-border-strong hover:border-purple-500/50 hover:bg-purple-500/5 text-foreground text-sm py-2.5 rounded-xl transition-all duration-300 group hover:scale-[1.02] active:scale-100 disabled:opacity-50"
             >
               <User className="w-4 h-4 text-purple-400 transition-transform duration-300 group-hover:scale-110" />
-              <span className="text-text-subtle group-hover:text-foreground transition-colors duration-300">Akses Tanpa Login</span>
+              <span className="text-text-subtle group-hover:text-foreground transition-colors duration-300">Access Without Login</span>
             </button>
           </div>
         </div>

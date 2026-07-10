@@ -14,7 +14,7 @@ import {
   MessageSquare, Search, FileText, Layers, Activity, GitCompare, BarChart3,
   LayoutDashboard, Settings, Users, Trash2,
   X, Plus, ChevronsUpDown, Sun, Moon, Bell,
-  PanelLeftClose, PanelLeftOpen, Workflow
+  PanelLeftClose, PanelLeftOpen, Workflow, Brain
 } from 'lucide-react'
 
 const NAV = [
@@ -24,6 +24,7 @@ const NAV = [
   { href: '/dashboard/extract', icon: Layers, label: 'Extraction' },
   { href: '/dashboard/workflows', icon: Workflow, label: 'AI Workflow Builder' },
   { href: '/dashboard/compare', icon: GitCompare, label: 'Model Comparison' },
+  { href: '/dashboard/visualizer', icon: Brain, label: 'NLP & ML Visualizer' },
 ]
 
 interface SideBarProps {
