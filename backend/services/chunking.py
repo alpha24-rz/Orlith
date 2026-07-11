@@ -473,3 +473,82 @@ class SemanticSimilaritySplitter:
             f"avg tokens={sum(c['token_count'] for c in chunks) / max(len(chunks), 1):.0f}"
         )
         return chunks
+
+
+def split_pages_hierarchical(
+    pages: list[dict],
+    child_size: int = 300,
+    parent_size: int = 1500,
+    child_overlap: int = 50,
+    is_markdown: bool = False
+) -> list[dict]:
+    """
+    Splits pages hierarchically:
+    1. First split the document into larger parent chunks using StructuralTextSplitter.
+    2. Then, split each parent chunk into smaller child chunks.
+    3. Each child chunk has reference to its parent chunk's full text in 'parent_content'.
+    """
+    # Use larger parent size for parent splitter
+    parent_splitter = StructuralTextSplitter(
+        chunk_size=parent_size,
+        chunk_overlap=child_overlap * 2,
+        is_markdown=is_markdown
+    )
+    parents = parent_splitter.split_pages(pages)
+
+    # Use smaller child size for child splitter
+    child_splitter = StructuralTextSplitter(
+        chunk_size=child_size,
+        chunk_overlap=child_overlap,
+        is_markdown=is_markdown
+    )
+
+    child_chunks = []
+    chunk_index = 0
+    for parent in parents:
+        parent_text = parent["text"]
+        parent_page = parent["page_number"]
+        parent_section = parent.get("section")
+
+        # Wrap parent chunk text as a temporary single page to run through the child splitter
+        temp_pages = [{"text": parent_text, "page_number": parent_page}]
+        children = child_splitter.split_pages(temp_pages)
+
+        for child in children:
+            child_chunks.append({
+                "text": child["text"],
+                "page_number": parent_page,
+                "section": parent_section or child.get("section"),
+                "chunk_index": chunk_index,
+                "token_count": child.get("token_count", 0),
+                "parent_content": parent_text
+            })
+            chunk_index += 1
+
+    return child_chunks
+
+
+def add_window_parent_context(chunks: list[dict]) -> list[dict]:
+    """
+    For dynamic/semantic chunks, generate parent context by combining the current
+    chunk with its immediate neighbors (prev + current + next).
+    """
+    if not chunks:
+        return []
+        
+    for i in range(len(chunks)):
+        prev_text = chunks[i-1]["text"] if i > 0 else ""
+        current_text = chunks[i]["text"]
+        next_text = chunks[i+1]["text"] if i < len(chunks) - 1 else ""
+        
+        # Merge them gracefully
+        parts = []
+        if prev_text:
+            parts.append(prev_text)
+        parts.append(current_text)
+        if next_text:
+            parts.append(next_text)
+            
+        chunks[i]["parent_content"] = "\n\n".join(parts)
+        
+    return chunks

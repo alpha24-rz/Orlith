@@ -85,6 +85,14 @@ async def init_db():
                     )
                 except Exception:
                     pass
+            
+            # Migrate Chunk parent_content
+            try:
+                await conn.execute(
+                    text("ALTER TABLE chunks ADD COLUMN parent_content VARCHAR")
+                )
+            except Exception:
+                pass
 
 
 async def get_db():

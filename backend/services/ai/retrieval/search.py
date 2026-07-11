@@ -130,6 +130,11 @@ async def build_context(reranked_chunks: List[Dict]) -> str:
         meta = chunk.get("meta", {})
         text = chunk.get("text", "")
         
+        # If parent_content is present, use it as context for LLM generation
+        parent_content = meta.get("parent_content")
+        if parent_content:
+            text = parent_content
+            
         source = meta.get("filename", "Unknown")
         page = meta.get("page_number", "?")
         section = meta.get("section", "")

@@ -18,6 +18,7 @@ class Chunk(Base):
     section = Column(String, nullable=True)
     chunk_index = Column(Integer, nullable=False)
     token_count = Column(Integer, nullable=False, default=0)
+    parent_content = Column(String, nullable=True)
     
     document = relationship("Document", backref=backref("chunks", cascade="all, delete-orphan", passive_deletes=True))
 

@@ -269,6 +269,7 @@ async def embed_document(
             "filename": document.filename,
             "page_number": c["page_number"],
             "chunk_index": c["chunk_index"],
+            "parent_content": c.get("parent_content", ""),
         }
         for c in chunks
     ]
@@ -286,7 +287,8 @@ async def embed_document(
             page_number=c["page_number"],
             section=c.get("section"),
             chunk_index=c["chunk_index"],
-            token_count=c.get("token_count", 0)
+            token_count=c.get("token_count", 0),
+            parent_content=c.get("parent_content"),
         )
         db.add(chunk_obj)
         db_chunks.append((chunk_obj, embeddings[i]))
@@ -380,29 +382,58 @@ async def process_document(document_id: str, db: AsyncSession, ocr: bool = False
         )
         
         chunks = []
-        if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
-            try:
-                from services.chunking import SemanticSimilaritySplitter
-                logger.info(f"Attempting semantic similarity chunking for {document.filename}")
-                semantic_splitter = SemanticSimilaritySplitter(
+        if settings.ENABLE_PARENT_CHILD_CHUNKING:
+            # Parent-Child Chunking flow
+            if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
+                try:
+                    from services.chunking import SemanticSimilaritySplitter, add_window_parent_context
+                    logger.info(f"Attempting semantic similarity parent-child chunking for {document.filename}")
+                    semantic_splitter = SemanticSimilaritySplitter(
+                        chunk_size=settings.CHILD_CHUNK_SIZE,
+                        chunk_overlap=settings.CHILD_CHUNK_OVERLAP,
+                    )
+                    raw_chunks = await semantic_splitter.split_pages_semantic(
+                        pages_data, embedding_provider, model_name
+                    )
+                    chunks = add_window_parent_context(raw_chunks)
+                except Exception as e:
+                    logger.exception(f"Semantic similarity parent-child chunking failed, falling back to structural hierarchical: {e}")
+
+            if not chunks:
+                from services.chunking import split_pages_hierarchical
+                logger.info(f"Using structural hierarchical (Parent-Child) chunking for {document.filename}")
+                chunks = split_pages_hierarchical(
+                    pages_data,
+                    child_size=settings.CHILD_CHUNK_SIZE,
+                    parent_size=settings.PARENT_CHUNK_SIZE,
+                    child_overlap=settings.CHILD_CHUNK_OVERLAP,
+                    is_markdown=is_markdown
+                )
+        else:
+            # Legacy/Normal Chunking flow
+            if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
+                try:
+                    from services.chunking import SemanticSimilaritySplitter
+                    logger.info(f"Attempting semantic similarity chunking for {document.filename}")
+                    semantic_splitter = SemanticSimilaritySplitter(
+                        chunk_size=settings.CHUNK_SIZE,
+                        chunk_overlap=settings.CHUNK_OVERLAP,
+                    )
+                    chunks = await semantic_splitter.split_pages_semantic(
+                        pages_data, embedding_provider, model_name
+                    )
+                except Exception as e:
+                    logger.exception(f"Semantic similarity chunking failed for {document.filename}, falling back to structural splitter: {e}")
+                    
+            if not chunks:
+                from services.chunking import StructuralTextSplitter
+                logger.info(f"Using structural text splitter for {document.filename}")
+                splitter = StructuralTextSplitter(
                     chunk_size=settings.CHUNK_SIZE,
                     chunk_overlap=settings.CHUNK_OVERLAP,
+                    is_markdown=is_markdown,
                 )
-                chunks = await semantic_splitter.split_pages_semantic(
-                    pages_data, embedding_provider, model_name
-                )
-            except Exception as e:
-                logger.exception(f"Semantic similarity chunking failed for {document.filename}, falling back to structural splitter: {e}")
-                
-        if not chunks:
-            from services.chunking import StructuralTextSplitter
-            logger.info(f"Using structural text splitter for {document.filename}")
-            splitter = StructuralTextSplitter(
-                chunk_size=settings.CHUNK_SIZE,
-                chunk_overlap=settings.CHUNK_OVERLAP,
-                is_markdown=is_markdown,
-            )
-            chunks = splitter.split_pages(pages_data)
+                chunks = splitter.split_pages(pages_data)
         
         total_chars = sum(len(c["text"]) for c in chunks)
 

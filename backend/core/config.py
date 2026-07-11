@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     RAG_FINAL_TOP_K: int = 5
     RAG_SIMILARITY_THRESHOLD: float = 0.5
     
+    # Parent-Child Chunking Settings
+    ENABLE_PARENT_CHILD_CHUNKING: bool = True
+    PARENT_CHUNK_SIZE: int = 1500
+    CHILD_CHUNK_SIZE: int = 300
+    CHILD_CHUNK_OVERLAP: int = 50
+    
     # Reranker Settings
     ENABLE_RERANKER: bool = True
     RERANKER_MODEL: str = "BAAI/bge-reranker-base"
