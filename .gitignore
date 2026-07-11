@@ -66,3 +66,6 @@ orlith-ai/
 
 # Large model files
 *.safetensors
+
+# Local testing files
+testing/
