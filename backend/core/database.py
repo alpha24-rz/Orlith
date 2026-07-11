@@ -61,38 +61,37 @@ async def init_db():
 
         await conn.run_sync(Base.metadata.create_all)
 
-        if settings.DATABASE_URL.startswith("sqlite"):
-            # Add columns dynamically if they do not exist
-            try:
-                await conn.execute(
-                    text("ALTER TABLE documents ADD COLUMN content_hash VARCHAR")
-                )
-            except Exception:
-                pass
+        # Add columns dynamically if they do not exist (works for both SQLite & Postgres)
+        try:
+            await conn.execute(
+                text("ALTER TABLE documents ADD COLUMN content_hash VARCHAR")
+            )
+        except Exception:
+            pass
 
+        try:
+            await conn.execute(
+                text("ALTER TABLE documents ADD COLUMN error_message VARCHAR")
+            )
+        except Exception:
+            pass
+        
+        # Migrate Workspace AI configs
+        for col in ["active_llm_provider", "active_llm_model", "active_embedding_provider", "active_embedding_model"]:
             try:
                 await conn.execute(
-                    text("ALTER TABLE documents ADD COLUMN error_message VARCHAR")
+                    text(f"ALTER TABLE workspaces ADD COLUMN {col} VARCHAR")
                 )
             except Exception:
                 pass
-            
-            # Migrate Workspace AI configs
-            for col in ["active_llm_provider", "active_llm_model", "active_embedding_provider", "active_embedding_model"]:
-                try:
-                    await conn.execute(
-                        text(f"ALTER TABLE workspaces ADD COLUMN {col} VARCHAR")
-                    )
-                except Exception:
-                    pass
-            
-            # Migrate Chunk parent_content
-            try:
-                await conn.execute(
-                    text("ALTER TABLE chunks ADD COLUMN parent_content VARCHAR")
-                )
-            except Exception:
-                pass
+        
+        # Migrate Chunk parent_content
+        try:
+            await conn.execute(
+                text("ALTER TABLE chunks ADD COLUMN parent_content VARCHAR")
+            )
+        except Exception:
+            pass
 
 
 async def get_db():
