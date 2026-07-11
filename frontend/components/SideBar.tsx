@@ -24,7 +24,6 @@ const NAV = [
   { href: '/dashboard/extract', icon: Layers, label: 'Extraction' },
   { href: '/dashboard/workflows', icon: Workflow, label: 'AI Workflow Builder' },
   { href: '/dashboard/compare', icon: GitCompare, label: 'Model Comparison' },
-  { href: '/dashboard/visualizer', icon: Brain, label: 'NLP & ML Visualizer' },
 ]
 
 interface SideBarProps {

@@ -26,7 +26,6 @@ const NAV = [
   { href: '/dashboard/workflows', icon: Workflow, label: 'AI Workflow Builder' },
   { href: '/dashboard/compare', icon: GitCompare, label: 'Model Comparison' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
-  { href: '/dashboard/visualizer', icon: Brain, label: 'NLP & ML Visualizer' },
 ]
 
 const BOTTOM_NAV = [
