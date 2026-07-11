@@ -61,35 +61,28 @@ async def init_db():
 
         await conn.run_sync(Base.metadata.create_all)
 
-        # Add columns dynamically if they do not exist (works for both SQLite & Postgres)
-        try:
-            await conn.execute(
-                text("ALTER TABLE documents ADD COLUMN content_hash VARCHAR")
-            )
-        except Exception:
-            pass
+    # Run dynamic column migrations OUTSIDE the main transaction.
+    # On PostgreSQL, a failed ALTER TABLE aborts the entire transaction,
+    # so we must run each migration in its own independent transaction.
+    is_postgres = not settings.DATABASE_URL.startswith("sqlite")
 
+    migrations = [
+        "ALTER TABLE documents ADD COLUMN content_hash VARCHAR",
+        "ALTER TABLE documents ADD COLUMN error_message VARCHAR",
+        "ALTER TABLE workspaces ADD COLUMN active_llm_provider VARCHAR",
+        "ALTER TABLE workspaces ADD COLUMN active_llm_model VARCHAR",
+        "ALTER TABLE workspaces ADD COLUMN active_embedding_provider VARCHAR",
+        "ALTER TABLE workspaces ADD COLUMN active_embedding_model VARCHAR",
+        "ALTER TABLE chunks ADD COLUMN parent_content VARCHAR",
+    ]
+
+    for sql in migrations:
         try:
-            await conn.execute(
-                text("ALTER TABLE documents ADD COLUMN error_message VARCHAR")
-            )
-        except Exception:
-            pass
-        
-        # Migrate Workspace AI configs
-        for col in ["active_llm_provider", "active_llm_model", "active_embedding_provider", "active_embedding_model"]:
-            try:
-                await conn.execute(
-                    text(f"ALTER TABLE workspaces ADD COLUMN {col} VARCHAR")
-                )
-            except Exception:
-                pass
-        
-        # Migrate Chunk parent_content
-        try:
-            await conn.execute(
-                text("ALTER TABLE chunks ADD COLUMN parent_content VARCHAR")
-            )
+            if is_postgres:
+                # Use IF NOT EXISTS syntax for PostgreSQL (9.6+)
+                sql = sql.replace("ADD COLUMN ", "ADD COLUMN IF NOT EXISTS ")
+            async with engine.begin() as conn:
+                await conn.execute(text(sql))
         except Exception:
             pass
 
