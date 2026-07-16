@@ -71,8 +71,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Post-process relative paths to ensure they resolve relative to the project root
-_project_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
+# Post-process relative paths to ensure they resolve relative to the backend root
+# Use the backend dir (parent of core/) instead of going up 2 levels,
+# which would resolve to "/" on HF Spaces and cause PermissionError.
+_backend_root = os.path.abspath(os.path.join(_current_dir, ".."))
+_project_root = _backend_root
 
 # Resolve SQLite DATABASE_URL if it contains a relative path
 if settings.DATABASE_URL.startswith("sqlite+aiosqlite:///"):
