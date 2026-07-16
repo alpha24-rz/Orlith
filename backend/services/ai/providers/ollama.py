@@ -41,7 +41,12 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 json=payload,
                 headers=self._headers(),
             )
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                try:
+                    err_msg = resp.json().get("error", resp.text)
+                except Exception:
+                    err_msg = resp.text
+                raise ValueError(f"Ollama API error ({resp.status_code}): {err_msg}")
             data = resp.json()
             return data.get("message", {}).get("content", "")
 
@@ -70,7 +75,13 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 json=payload,
                 headers=self._headers(),
             ) as resp:
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    body = await resp.aread()
+                    try:
+                        err_msg = json.loads(body.decode()).get("error", body.decode())
+                    except Exception:
+                        err_msg = body.decode() if body else str(resp.status_code)
+                    raise ValueError(f"Ollama API error ({resp.status_code}): {err_msg}")
                 async for line in resp.aiter_lines():
                     if line:
                         try:
