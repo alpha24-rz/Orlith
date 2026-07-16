@@ -17,6 +17,10 @@ class Document(Base):
     status = Column(String, default="uploading")  # uploading, processing, ready, error
     content_hash = Column(String, nullable=True)
     error_message = Column(String, nullable=True)
+    page_count = Column(Integer, nullable=True)
+    word_count = Column(Integer, nullable=True)
+    mime_type = Column(String, nullable=True)
+    text_hash = Column(String, nullable=True)
     # Document Metadata
     metadata_json = Column(
         JSON, nullable=True

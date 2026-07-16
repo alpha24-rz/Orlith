@@ -69,6 +69,10 @@ async def init_db():
     migrations = [
         "ALTER TABLE documents ADD COLUMN content_hash VARCHAR",
         "ALTER TABLE documents ADD COLUMN error_message VARCHAR",
+        "ALTER TABLE documents ADD COLUMN page_count INTEGER",
+        "ALTER TABLE documents ADD COLUMN word_count INTEGER",
+        "ALTER TABLE documents ADD COLUMN mime_type VARCHAR",
+        "ALTER TABLE documents ADD COLUMN text_hash VARCHAR",
         "ALTER TABLE workspaces ADD COLUMN active_llm_provider VARCHAR",
         "ALTER TABLE workspaces ADD COLUMN active_llm_model VARCHAR",
         "ALTER TABLE workspaces ADD COLUMN active_embedding_provider VARCHAR",

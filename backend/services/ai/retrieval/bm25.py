@@ -13,6 +13,36 @@ logger = logging.getLogger(__name__)
 
 # Cache: workspace_id -> {"state_hash": int, "index": BM25Okapi, "chunks": list}
 _bm25_cache = {}
+_rebuild_tasks = {}
+
+def invalidate_cache(workspace_id: str):
+    """Invalidate cache and trigger a debounced rebuild."""
+    if workspace_id in _bm25_cache:
+        del _bm25_cache[workspace_id]
+        
+    if workspace_id in _rebuild_tasks:
+        _rebuild_tasks[workspace_id].cancel()
+        
+    async def _debounced_rebuild():
+        try:
+            await asyncio.sleep(5.0)
+            logger.info(f"Debounce triggered rebuild for workspace {workspace_id}")
+            from core.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as db:
+                await get_bm25_index(workspace_id, db)
+        except asyncio.CancelledError:
+            logger.debug(f"BM25 rebuild debounced for workspace {workspace_id}")
+        finally:
+            if workspace_id in _rebuild_tasks:
+                del _rebuild_tasks[workspace_id]
+                
+    task = asyncio.create_task(_debounced_rebuild())
+    _rebuild_tasks[workspace_id] = task
+
+async def _on_document_ready(data: dict):
+    workspace_id = data.get("workspace_id")
+    if workspace_id:
+        invalidate_cache(workspace_id)
 
 async def _get_corpus_state_hash(workspace_id: str, db: AsyncSession) -> int:
     stmt = select(Document.id, Document.status, Document.content_hash).where(Document.workspace_id == workspace_id)
@@ -91,3 +121,7 @@ async def retrieve_bm25(workspace_id: str, query: str, top_k: int, db: AsyncSess
             
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:top_k], cache_hit, len(chunks)
+
+# Register BM25 Debounce subscriber
+from services.event_bus import EventBus
+EventBus.subscribe("DocumentReadyEvent", _on_document_ready)

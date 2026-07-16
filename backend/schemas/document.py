@@ -18,6 +18,10 @@ class DocumentResponse(DocumentBase):
     file_size: int
     status: str
     content_hash: Optional[str] = None
+    page_count: Optional[int] = None
+    word_count: Optional[int] = None
+    mime_type: Optional[str] = None
+    text_hash: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
 
@@ -40,6 +44,10 @@ class DocumentResponse(DocumentBase):
                 "file_size": getattr(data, "file_size"),
                 "status": getattr(data, "status"),
                 "content_hash": getattr(data, "content_hash", None),
+                "page_count": getattr(data, "page_count", None),
+                "word_count": getattr(data, "word_count", None),
+                "mime_type": getattr(data, "mime_type", None),
+                "text_hash": getattr(data, "text_hash", None),
                 "metadata": metadata_val,
                 "created_at": getattr(data, "created_at"),
             }

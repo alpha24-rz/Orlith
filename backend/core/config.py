@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     EMBEDDING_PROVIDER: str = "huggingface"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
 
+    # Ingestion Settings
+    INGESTION_CONCURRENCY: int = 3
+
+
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/documind.db"
     CHROMA_PERSIST_DIR: str = "./data/chroma"

@@ -49,3 +49,4 @@ litellm
 
 # OCR
 easyocr
+langdetect==1.0.9

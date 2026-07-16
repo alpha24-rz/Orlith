@@ -76,11 +76,31 @@ async def upload_document(
     content_hash = hasher.hexdigest()
     file.file.seek(0)
 
+    # Check for duplicate content in workspace (Exact match)
+    existing = await db.execute(
+        select(Document).where(
+            Document.workspace_id == workspace.id,
+            Document.content_hash == content_hash,
+            Document.status == "ready"
+        )
+    )
+    duplicate = existing.scalars().first()
+    if duplicate:
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=409,
+            detail=f"Dokumen identik sudah ada: {duplicate.filename}"
+        )
+
     document = Document(
         workspace_id=workspace.id,
         filename=file.filename,
         file_path=file_path,
         file_type=ext,
+        mime_type=file.content_type,
         file_size=file_size,
         status="uploading",
         content_hash=content_hash,
@@ -94,9 +114,9 @@ async def upload_document(
     # Broadcast initial "uploading" status
     await broadcast_status(document, db)
 
-    # NOTE: process_document_standalone creates its own DB session to avoid
-    # holding connections open while waiting for the sequential ingestion lock
-    background_tasks.add_task(process_document_standalone, document.id, ocr)
+    import asyncio
+    enqueue_time = asyncio.get_event_loop().time()
+    background_tasks.add_task(process_document_standalone, document.id, ocr, enqueue_time)
 
     return document
 
@@ -130,9 +150,9 @@ async def reprocess_document(
     from api.deps import get_workspace_member
     await get_workspace_member(document.workspace_id, current_user, db)
 
-    # NOTE: process_document_standalone creates its own DB session to avoid
-    # holding connections open while waiting for the sequential ingestion lock
-    background_tasks.add_task(process_document_standalone, document.id, ocr)
+    import asyncio
+    enqueue_time = asyncio.get_event_loop().time()
+    background_tasks.add_task(process_document_standalone, document.id, ocr, enqueue_time)
 
     return {"message": "Document re-processing started"}
 

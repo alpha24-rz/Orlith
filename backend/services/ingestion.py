@@ -20,7 +20,7 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-_ingestion_lock = asyncio.Lock()
+_ingestion_semaphore = asyncio.Semaphore(settings.INGESTION_CONCURRENCY)
 
 _easyocr_reader = None
 
@@ -236,6 +236,20 @@ async def broadcast_status(document: Document, db: AsyncSession, error_msg: str 
             await manager.broadcast_to_workspace(f"global_{notif.user_id}", payload_global)
 
 
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from httpx import HTTPStatusError, ConnectError, TimeoutException
+
+def is_transient_error(e):
+    if isinstance(e, HTTPStatusError):
+        return e.response.status_code in (429, 502, 503, 504)
+    return isinstance(e, (ConnectError, TimeoutException, ConnectionError))
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception(is_transient_error),
+    before_sleep=lambda rs: logger.warning(f"Transient error, retrying embedding #{rs.attempt_number}...")
+)
 async def embed_document(
     document: Document, chunks: list, embedding_provider, model_name: str, db: AsyncSession, provider_name: str
 ):
@@ -308,12 +322,13 @@ async def embed_document(
     await db.commit()
 
 
-async def process_document_standalone(document_id: str, ocr: bool = False):
+async def process_document_standalone(document_id: str, ocr: bool = False, enqueue_time: float = None):
     """
     Standalone background task entry point.
-    Acquires the sequential ingestion lock BEFORE opening a database connection
-    to prevent connection pool starvation.
     """
+    if enqueue_time is None:
+        enqueue_time = asyncio.get_event_loop().time()
+        
     # 1. Update status to "processing" immediately so the UI shows it as processing
     from core.database import AsyncSessionLocal
     try:
@@ -326,144 +341,9 @@ async def process_document_standalone(document_id: str, ocr: bool = False):
     except Exception as e:
         logger.warning(f"Could not set initial processing status for document {document_id}: {e}")
 
-    # 2. Acquire sequential ingestion lock and run the heavy ingestion process
-    async with _ingestion_lock:
+    # 2. Acquire sequential ingestion semaphore and run the heavy ingestion process
+    async with _ingestion_semaphore:
         async with AsyncSessionLocal() as db:
-            await process_document(document_id, db, ocr)
-
-
-async def process_document(document_id: str, db: AsyncSession, ocr: bool = False):
-    """Background task to extract, chunk, embed, and store a document."""
-    document = await db.get(Document, document_id)
-    if not document:
-        logger.error(f"Ingestion failed: Document {document_id} not found in database.")
-        return
-
-    # Ensure status is committed as processing
-    if document.status != "processing":
-        document.status = "processing"
-        await db.commit()
-        await db.refresh(document)
-        await broadcast_status(document, db)
-
-    try:
-        workspace = await db.get(Workspace, document.workspace_id)
-        if not workspace:
-            raise ValueError(f"Workspace {document.workspace_id} not found.")
-
-        from services.ai.gateway import LLMGateway
-        gateway = LLMGateway(db)
-        embedding_provider, model_name = await gateway.get_embedding_provider(workspace)
-        
-        # Determine provider name dynamically
-        if settings.EMBEDDING_PROVIDER == "huggingface":
-            provider_name = "huggingface"
-        elif workspace and getattr(workspace, "active_embedding_provider", None):
-            provider_name = workspace.active_embedding_provider
-        elif settings.GEMINI_API_KEY:
-            provider_name = "gemini"
-        else:
-            provider_name = "openrouter"
-
-        # Update content hash
-        if not document.content_hash:
-            document.content_hash = get_file_hash(document.file_path)
-
-        # Extract text (now per page) - CPU bound so run in thread pool
-        pages_data, meta = await asyncio.to_thread(
-            extract_text_from_file,
-            document.file_path, document.file_type, ocr
-        )
-
-        # Setup splitter
-        is_markdown = (
-            document.file_type == "text/markdown"
-            or document.file_path.lower().endswith((".md", ".markdown"))
-        )
-        
-        chunks = []
-        if settings.ENABLE_PARENT_CHILD_CHUNKING:
-            # Parent-Child Chunking flow
-            if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
-                try:
-                    from services.chunking import SemanticSimilaritySplitter, add_window_parent_context
-                    logger.info(f"Attempting semantic similarity parent-child chunking for {document.filename}")
-                    semantic_splitter = SemanticSimilaritySplitter(
-                        chunk_size=settings.CHILD_CHUNK_SIZE,
-                        chunk_overlap=settings.CHILD_CHUNK_OVERLAP,
-                    )
-                    raw_chunks = await semantic_splitter.split_pages_semantic(
-                        pages_data, embedding_provider, model_name
-                    )
-                    chunks = add_window_parent_context(raw_chunks)
-                except Exception as e:
-                    logger.exception(f"Semantic similarity parent-child chunking failed, falling back to structural hierarchical: {e}")
-
-            if not chunks:
-                from services.chunking import split_pages_hierarchical
-                logger.info(f"Using structural hierarchical (Parent-Child) chunking for {document.filename}")
-                chunks = split_pages_hierarchical(
-                    pages_data,
-                    child_size=settings.CHILD_CHUNK_SIZE,
-                    parent_size=settings.PARENT_CHUNK_SIZE,
-                    child_overlap=settings.CHILD_CHUNK_OVERLAP,
-                    is_markdown=is_markdown
-                )
-        else:
-            # Legacy/Normal Chunking flow
-            if not is_markdown and settings.ENABLE_SEMANTIC_CHUNKING:
-                try:
-                    from services.chunking import SemanticSimilaritySplitter
-                    logger.info(f"Attempting semantic similarity chunking for {document.filename}")
-                    semantic_splitter = SemanticSimilaritySplitter(
-                        chunk_size=settings.CHUNK_SIZE,
-                        chunk_overlap=settings.CHUNK_OVERLAP,
-                    )
-                    chunks = await semantic_splitter.split_pages_semantic(
-                        pages_data, embedding_provider, model_name
-                    )
-                except Exception as e:
-                    logger.exception(f"Semantic similarity chunking failed for {document.filename}, falling back to structural splitter: {e}")
-                    
-            if not chunks:
-                from services.chunking import StructuralTextSplitter
-                logger.info(f"Using structural text splitter for {document.filename}")
-                splitter = StructuralTextSplitter(
-                    chunk_size=settings.CHUNK_SIZE,
-                    chunk_overlap=settings.CHUNK_OVERLAP,
-                    is_markdown=is_markdown,
-                )
-                chunks = splitter.split_pages(pages_data)
-        
-        total_chars = sum(len(c["text"]) for c in chunks)
-
-        if not chunks:
-            raise ValueError("No text content could be extracted from the file.")
-
-        # Embed and store to Chroma + Postgres
-        await embed_document(document, chunks, embedding_provider, model_name, db, provider_name)
-
-        # Complete status update
-        document.status = "ready"
-        meta["chunk_count"] = len(chunks)
-        meta["char_count"] = total_chars
-        document.metadata_json = meta
-
-        await db.commit()
-        await db.refresh(document)
-        await broadcast_status(document, db)
-
-    except Exception as e:
-        logger.exception(f"Error during document ingestion: {e}")
-        # Set status to error/failed
-        document.status = "error"
-        error_msg = str(e)
-        document.error_message = error_msg
-        
-        if document.metadata_json is None:
-            document.metadata_json = {}
-        document.metadata_json = {**document.metadata_json, "error": error_msg}
-
-        await db.commit()
-        await db.refresh(document)
-        await broadcast_status(document, db, error_msg=error_msg)
+            from services.pipeline import DocumentPipeline
+            pipeline = DocumentPipeline(db)
+            await pipeline.process(document_id, ocr, enqueue_time)

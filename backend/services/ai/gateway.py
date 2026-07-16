@@ -9,6 +9,7 @@ from models.credential import WorkspaceCredential
 from providers.manager import ProviderManager
 from core.security import decrypt_api_key
 import json
+from services.ai.health_monitor import openai_health, gemini_health, huggingface_health
 
 logger = logging.getLogger(__name__)
 
@@ -143,12 +144,12 @@ class LLMGateway:
                     actual_model = f"openrouter/{actual_model}"
                 return OpenRouterAdapter(), actual_model
 
-        # Fallback to Gemini if configured
-        if settings.GEMINI_API_KEY:
+        # Fallback to Gemini if configured and not offline
+        if settings.GEMINI_API_KEY and gemini_health.state != "Offline":
             from providers.gemini import GeminiProvider
             return GeminiProvider(settings.GEMINI_API_KEY), "gemini-1.5-flash"
 
-        # Fallback to OpenRouter
+        # Fallback to OpenRouter (OpenAI fallback)
         model = settings.LLM_MODEL
         if not model.startswith("openrouter/"):
             model = f"openrouter/{model}"
