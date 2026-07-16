@@ -34,8 +34,13 @@ class ProviderManager:
             return GeminiProvider(api_key)
             
         elif provider_name == "ollama":
-            base_url = credential_json.get("base_url", "http://localhost:11434")
-            return OllamaProvider(base_url)
+            api_key_or_url = credential_json.get("base_url") or credential_json.get("api_key")
+            if not api_key_or_url:
+                return OllamaProvider(base_url="http://localhost:11434")
+            elif api_key_or_url.startswith("http://") or api_key_or_url.startswith("https://"):
+                return OllamaProvider(base_url=api_key_or_url)
+            else:
+                return OllamaProvider(base_url="https://ollama.com", api_key=api_key_or_url)
             
         elif provider_name == "openrouter":
             api_key = credential_json.get("api_key")

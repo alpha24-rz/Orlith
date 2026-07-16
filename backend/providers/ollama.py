@@ -7,8 +7,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 class OllamaProvider(ILLMProvider, IEmbeddingProvider):
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = "http://localhost:11434", api_key: str = None):
         self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+
+    def _headers(self) -> dict:
+        headers = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     async def generate_response(
         self,
@@ -32,6 +39,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
+                headers=self._headers(),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -60,6 +68,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 "POST",
                 f"{self.base_url}/api/chat",
                 json=payload,
+                headers=self._headers(),
             ) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -75,7 +84,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
     async def get_available_models(self) -> list[str]:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
-                resp = await client.get(f"{self.base_url}/api/tags")
+                resp = await client.get(f"{self.base_url}/api/tags", headers=self._headers())
                 if resp.status_code == 200:
                     data = resp.json()
                     return [m["name"] for m in data.get("models", [])]
@@ -86,7 +95,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
     async def validate_api_key(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=2) as client:
-                resp = await client.get(self.base_url)
+                resp = await client.get(self.base_url, headers=self._headers())
                 return resp.status_code == 200
         except Exception:
             return False
@@ -102,6 +111,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 resp = await client.post(
                     f"{self.base_url}/api/embed",
                     json=payload,
+                    headers=self._headers(),
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -121,6 +131,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 resp = await client.post(
                     f"{self.base_url}/api/embeddings",
                     json=payload,
+                    headers=self._headers(),
                 )
                 resp.raise_for_status()
                 data = resp.json()

@@ -27,9 +27,13 @@ def get_provider_adapter(
             raise ValueError("Gemini requires an API key")
         return GeminiProvider(api_key)
     elif provider_name == "ollama":
-        # Ollama base URL can be passed as api_key for now, or just use default
-        base_url = api_key if api_key else "http://localhost:11434"
-        return OllamaProvider(base_url)
+        # Ollama base URL can be passed as api_key, or an actual API key for Ollama Cloud
+        if not api_key:
+            return OllamaProvider(base_url="http://localhost:11434")
+        elif api_key.startswith("http://") or api_key.startswith("https://"):
+            return OllamaProvider(base_url=api_key)
+        else:
+            return OllamaProvider(base_url="https://ollama.com", api_key=api_key)
     elif provider_name == "openrouter":
         if not api_key:
             raise ValueError("OpenRouter requires an API key")

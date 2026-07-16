@@ -757,14 +757,14 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
-              {newKeyProvider === 'ollama' ? 'Base URL' : 'API Key'}
+              {newKeyProvider === 'ollama' ? 'Base URL or API Key' : 'API Key'}
             </label>
             <div className="relative">
               <input
-                type={newKeyProvider === 'ollama' ? 'text' : 'password'}
+                type={newKeyProvider === 'ollama' && (newKeyString.startsWith('http') || newKeyString === '') ? 'text' : 'password'}
                 value={newKeyString}
                 onChange={(e) => setNewKeyString(e.target.value)}
-                placeholder={newKeyProvider === 'ollama' ? 'http://localhost:11434' : 'sk-...'}
+                placeholder={newKeyProvider === 'ollama' ? 'http://localhost:11434 or ollama_...' : 'sk-...'}
                 className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-xs text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
                 required
               />
