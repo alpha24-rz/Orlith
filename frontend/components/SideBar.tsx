@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
@@ -49,6 +49,26 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (workspaceRef.current && !workspaceRef.current.contains(event.target as Node)) {
+        setWorkspaceMenuOpen(false)
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false)
+        setNotificationsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   useEffect(() => setMounted(true), [])
 
@@ -111,7 +131,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </div>
 
       {/* ── Workspace switcher ── */}
-      <div className="p-3 border-b border-border-subtle relative z-20">
+      <div ref={workspaceRef} className="p-3 border-b border-border-subtle relative z-20">
         <button
           onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-hover transition-colors min-w-0"
@@ -225,8 +245,8 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
         <div className={`mt-4 transition-all duration-300 ${isCollapsed ? 'opacity-0 max-h-0 overflow-hidden' : 'opacity-100'}`}>
           <div className="flex items-center justify-between px-3 mb-2">
             <span className="text-xs font-bold text-foreground">Recent Chats</span>
-            <Link 
-              href="/dashboard/chat" 
+            <Link
+              href="/dashboard/chat"
               onClick={() => setSidebarOpen?.(false)}
               className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
               title="New Chat"
@@ -271,7 +291,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </nav>
 
       {/* ── Bottom nav ── */}
-      <div className="p-3 border-t border-border-subtle flex flex-col relative">
+      <div ref={userMenuRef} className="p-3 border-t border-border-subtle flex flex-col relative">
 
         {/* User Profile */}
         <button
@@ -287,7 +307,6 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           </div>
           <div className={`flex-1 min-w-0 ${labelClass}`}>
             <div className="text-xs font-semibold text-foreground truncate">{displayName}</div>
-            <div className="text-[10px] text-text-muted truncate">Growth plan</div>
           </div>
         </button>
 
