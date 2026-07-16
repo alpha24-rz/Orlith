@@ -31,20 +31,21 @@ async def list_provider_models(
 ):
     from core.security import decrypt_api_key
 
-    # Special case: ollama doesn't need key
-    if provider_id == "ollama":
-        try:
-            adapter = get_provider_adapter("ollama")
-            return await adapter.get_available_models()
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch models: {str(e)}")
-
     result = await db.execute(
         select(UserAPIKey).where(
             UserAPIKey.user_id == current_user.id, UserAPIKey.provider == provider_id
         )
     )
     key_record = result.scalars().first()
+
+    # Special case: ollama can work without a key record (defaulting to local)
+    if provider_id == "ollama" and not key_record:
+        try:
+            adapter = get_provider_adapter("ollama")
+            return await adapter.get_available_models()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch models: {str(e)}")
+
     if not key_record:
         raise HTTPException(
             status_code=404, detail="API key not found for this provider"
