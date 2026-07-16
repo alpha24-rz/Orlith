@@ -94,8 +94,16 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
 
     async def validate_api_key(self) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=2) as client:
-                resp = await client.get(self.base_url, headers=self._headers())
+            async with httpx.AsyncClient(timeout=10) as client:
+                # For cloud (with api_key), validate via /api/tags endpoint
+                # For local, a simple GET to the base URL is sufficient
+                if self.api_key:
+                    resp = await client.get(
+                        f"{self.base_url}/api/tags",
+                        headers=self._headers(),
+                    )
+                else:
+                    resp = await client.get(self.base_url)
                 return resp.status_code == 200
         except Exception:
             return False
