@@ -19,6 +19,7 @@ import GlobalToast from '@/components/GlobalToast'
 import GlobalWebSocket from '@/components/GlobalWebSocket'
 
 const NAV = [
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/chat', icon: MessageSquare, label: 'Chat & Q&A' },
   { href: '/dashboard/search', icon: Search, label: 'Semantic Search' },
   { href: '/dashboard/documents', icon: FileText, label: 'Documents' },
