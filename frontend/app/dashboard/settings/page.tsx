@@ -741,6 +741,7 @@ export default function SettingsPage() {
                 <option value="anthropic">Anthropic</option>
                 <option value="gemini">Google Gemini</option>
                 <option value="openrouter">OpenRouter</option>
+                <option value="ollama">Ollama (Local)</option>
               </select>
             </div>
             <div>
@@ -755,17 +756,19 @@ export default function SettingsPage() {
             </div>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">API Key</label>
+            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
+              {newKeyProvider === 'ollama' ? 'Base URL' : 'API Key'}
+            </label>
             <div className="relative">
               <input
-                type="password"
+                type={newKeyProvider === 'ollama' ? 'text' : 'password'}
                 value={newKeyString}
                 onChange={(e) => setNewKeyString(e.target.value)}
-                placeholder="sk-..."
+                placeholder={newKeyProvider === 'ollama' ? 'http://localhost:11434' : 'sk-...'}
                 className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-border-strong bg-bg-panel text-xs text-foreground focus:outline-none focus:border-indigo-500 transition-colors"
                 required
               />
-              <Key className="w-4 h-4 text-text-muted absolute right-3 top-1/2 -translate-y-1/2" />
+              {newKeyProvider !== 'ollama' && <Key className="w-4 h-4 text-text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
             </div>
           </div>
           <div className="flex justify-end mt-2">
