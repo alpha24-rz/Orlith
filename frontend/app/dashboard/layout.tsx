@@ -19,7 +19,6 @@ import GlobalToast from '@/components/GlobalToast'
 import GlobalWebSocket from '@/components/GlobalWebSocket'
 
 const NAV = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/chat', icon: MessageSquare, label: 'Chat & Q&A' },
   { href: '/dashboard/search', icon: Search, label: 'Semantic Search' },
   { href: '/dashboard/documents', icon: FileText, label: 'Documents' },
@@ -92,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       group: 'Navigation',
       items: [
-        { label: 'Go to Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { label: 'Go to Dashboard Overview', href: '/dashboard/overview', icon: LayoutDashboard },
         { label: 'Go to Chat & Q&A', href: '/dashboard/chat', icon: MessageSquare },
         { label: 'Go to Semantic Search', href: '/dashboard/search', icon: Search },
         { label: 'Go to Documents Library', href: '/dashboard/documents', icon: FileText },

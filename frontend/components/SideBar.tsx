@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/chat', icon: MessageSquare, label: 'Chat & Q&A' },
   { href: '/dashboard/search', icon: Search, label: 'Semantic Search' },
   { href: '/dashboard/documents', icon: FileText, label: 'Documents' },
@@ -304,11 +303,11 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
             </div>
             <div className="p-1.5 flex flex-col">
               <Link
-                href="/dashboard"
+                href="/dashboard/overview"
                 onClick={() => setUserMenuOpen(false)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-subtle hover:text-foreground hover:bg-bg-hover transition-colors"
               >
-                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard Overview
               </Link>
               <Link
                 href="/dashboard/settings"

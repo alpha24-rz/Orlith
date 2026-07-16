@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 2. Redirect logged-in users away from auth pages to /dashboard directly
+  // 2. Redirect logged-in users away from auth pages to /dashboard/chat directly
   if (
     pathname === '/' ||
     pathname.startsWith('/login') ||
@@ -21,9 +21,15 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/signup')
   ) {
     if (token) {
-      const dashboardUrl = new URL('/dashboard', request.url)
-      return NextResponse.redirect(dashboardUrl)
+      const chatUrl = new URL('/dashboard/chat', request.url)
+      return NextResponse.redirect(chatUrl)
     }
+  }
+
+  // 3. Redirect direct /dashboard requests to /dashboard/chat (Chat as Main Page)
+  if (pathname === '/dashboard') {
+    const chatUrl = new URL('/dashboard/chat', request.url)
+    return NextResponse.redirect(chatUrl)
   }
 
   return NextResponse.next()

@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { mockMembers, mockUser } from '@/lib/mock-data'
+import Link from 'next/link'
 import {
   Settings, Users, Brain, Shield, CreditCard, Bell,
   Plus, Trash2, Mail, Crown, Edit2, Eye, ChevronRight,
   Save, Check, X, Key, Globe, Zap, Database, Lock,
-  ExternalLink, AlertCircle, CheckCircle2, Copy, Download, Loader2, Building2, Sparkles, RefreshCw
+  ExternalLink, AlertCircle, CheckCircle2, Copy, Download, Loader2, Building2, Sparkles, RefreshCw, LayoutDashboard
 } from 'lucide-react'
 
 import { axiosClient } from '@/lib/axios-client'
@@ -870,14 +871,22 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-y-auto px-6 py-8">
       <div className="max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-black mb-2">Settings</h1>
-        <p className="text-sm text-text-subtle">Manage workspace, members, and AI providers</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-black mb-2">Settings</h1>
+          <p className="text-sm text-text-subtle">Manage workspace, members, and AI providers</p>
+        </div>
+        <Link
+          href="/dashboard/overview"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/20"
+        >
+          <LayoutDashboard className="w-4 h-4" /> Open Dashboard Overview
+        </Link>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar tabs */}
-        <div className="md:w-52 shrink-0">
+        <div className="md:w-52 shrink-0 space-y-4">
           <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0" style={{ scrollbarWidth: 'none' }}>
             {SETTING_TABS.map(tab => (
               <button
@@ -895,6 +904,16 @@ export default function SettingsPage() {
               </button>
             ))}
           </nav>
+          
+          <div className="pt-3 border-t border-border-subtle hidden md:block">
+            <Link
+              href="/dashboard/overview"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-indigo-400 hover:bg-indigo-500/10 transition-all"
+            >
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span>Analytics Dashboard</span>
+            </Link>
+          </div>
         </div>
 
         {/* Content */}
