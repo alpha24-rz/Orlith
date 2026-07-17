@@ -189,15 +189,23 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           </AnimatePresence>
         </button>
 
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onOpenCommandPalette}
-          className={`rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-colors flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs ${isCollapsed ? 'p-2 w-full' : 'p-2'}`}
-          title="Search (⌘K)"
-        >
-          <Search className="w-4 h-4 shrink-0" />
-        </motion.button>
+        <AnimatePresence mode="popLayout">
+          {!isCollapsed && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8, width: 0 }}
+              animate={{ opacity: 1, scale: 1, width: 'auto' }}
+              exit={{ opacity: 0, scale: 0.8, width: 0 }}
+              transition={{ duration: 0.18 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onOpenCommandPalette}
+              className="rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-colors flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs p-2 overflow-hidden"
+              title="Search (⌘K)"
+            >
+              <Search className="w-4 h-4 shrink-0" />
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {workspaceMenuOpen && (
