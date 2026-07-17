@@ -10,6 +10,7 @@ class ILLMProvider(ABC):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> str: ...
 
     @abstractmethod
@@ -19,6 +20,7 @@ class ILLMProvider(ABC):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> AsyncIterator[str]: ...
 
     @abstractmethod

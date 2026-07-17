@@ -3,9 +3,9 @@ from .openai import OpenAIProvider
 from .anthropic import AnthropicProvider
 from .ollama import OllamaProvider
 from .openrouter import OpenRouterProvider
-from .gemini import GeminiProvider
+from .gemini import GeminiProvider, InteractionsGeminiProvider
 
-SUPPORTED_PROVIDERS = ["openai", "anthropic", "ollama", "openrouter", "gemini"]
+SUPPORTED_PROVIDERS = ["openai", "anthropic", "ollama", "openrouter", "gemini", "gemini_interactions"]
 
 
 def get_provider_adapter(
@@ -26,6 +26,10 @@ def get_provider_adapter(
         if not api_key:
             raise ValueError("Gemini requires an API key")
         return GeminiProvider(api_key)
+    elif provider_name in ("gemini_interactions", "gemini-interactions"):
+        if not api_key:
+            raise ValueError("Gemini Interactions requires an API key")
+        return InteractionsGeminiProvider(api_key)
     elif provider_name == "ollama":
         # Ollama base URL can be passed as api_key, or an actual API key for Ollama Cloud
         api_key_clean = api_key.strip() if api_key else None

@@ -19,6 +19,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> str:
         payload = {
             "model": model,
@@ -41,6 +42,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> AsyncIterator[str]:
         payload = {
             "model": model,
@@ -109,3 +111,168 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             data = resp.json()["data"]
             data.sort(key=lambda x: x["index"])
             return [item["embedding"] for item in data]
+
+
+class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
+    """
+    Advanced adapter using the new Gemini Interactions API (/v1beta/interactions).
+    Supports:
+      - Stateful multi-turn conversations (via `previous_interaction_id`)
+      - Granular SSE streaming (`step.delta`)
+      - Native tools (e.g. `google_search` grounding)
+      - Strict structured output (`response_format` with schema)
+      - Background execution (`background=True`)
+    """
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+        self.headers = {
+            "x-goog-api-key": self.api_key,
+            "Content-Type": "application/json",
+        }
+        self._embedding_delegate = GeminiProvider(api_key)
+
+    def _prepare_input(self, messages: list[dict], previous_interaction_id: str = None, store: bool = True) -> dict | list | str:
+        if previous_interaction_id and messages:
+            return messages[-1].get("content", "")
+        
+        if len(messages) == 1 and isinstance(messages[0].get("content"), str):
+            return messages[0].get("content")
+            
+        formatted_input = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                formatted_input.append({
+                    "type": "user_input",
+                    "content": [{"type": "text", "text": f"[System Instructions]: {content}"}]
+                })
+            elif role in ("assistant", "model"):
+                formatted_input.append({
+                    "type": "model_output",
+                    "content": [{"type": "text", "text": str(content)}]
+                })
+            else:
+                if isinstance(content, str):
+                    formatted_input.append({
+                        "type": "user_input",
+                        "content": [{"type": "text", "text": content}]
+                    })
+                else:
+                    formatted_input.append({
+                        "type": "user_input",
+                        "content": content
+                    })
+        return formatted_input
+
+    async def generate_response(
+        self,
+        messages: list[dict],
+        model: str,
+        temperature: float = 0.1,
+        max_tokens: int = 2048,
+        **kwargs,
+    ) -> str:
+        previous_interaction_id = kwargs.get("previous_interaction_id")
+        store = kwargs.get("store", True)
+        tools = kwargs.get("tools")
+        response_format = kwargs.get("response_format")
+        background = kwargs.get("background", False)
+
+        input_data = self._prepare_input(messages, previous_interaction_id, store)
+        payload = {
+            "model": model,
+            "input": input_data,
+        }
+        if previous_interaction_id:
+            payload["previous_interaction_id"] = previous_interaction_id
+        if not previous_interaction_id and not store:
+            payload["store"] = False
+        if tools:
+            payload["tools"] = tools
+        if response_format:
+            payload["response_format"] = response_format
+        if background:
+            payload["background"] = True
+
+        async with httpx.AsyncClient(timeout=90) as client:
+            resp = await client.post(
+                self.base_url,
+                json=payload,
+                headers=self.headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            
+            # If output_text exists directly, return it
+            if "output_text" in data and data["output_text"]:
+                return data["output_text"]
+                
+            # Otherwise extract text from steps
+            steps = data.get("steps", [])
+            output_texts = []
+            for step in steps:
+                if step.get("type") == "model_output":
+                    for c in step.get("content", []):
+                        if c.get("type") == "text" and c.get("text"):
+                            output_texts.append(c["text"])
+            return "\n".join(output_texts) if output_texts else ""
+
+    async def stream_response(
+        self,
+        messages: list[dict],
+        model: str,
+        temperature: float = 0.1,
+        max_tokens: int = 2048,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        previous_interaction_id = kwargs.get("previous_interaction_id")
+        store = kwargs.get("store", True)
+        tools = kwargs.get("tools")
+        response_format = kwargs.get("response_format")
+
+        input_data = self._prepare_input(messages, previous_interaction_id, store)
+        payload = {
+            "model": model,
+            "input": input_data,
+            "stream": True,
+        }
+        if previous_interaction_id:
+            payload["previous_interaction_id"] = previous_interaction_id
+        if not previous_interaction_id and not store:
+            payload["store"] = False
+        if tools:
+            payload["tools"] = tools
+        if response_format:
+            payload["response_format"] = response_format
+
+        async with httpx.AsyncClient(timeout=90) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}?alt=sse",
+                json=payload,
+                headers=self.headers,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: ") and line != "data: [DONE]":
+                        try:
+                            data = json.loads(line[6:])
+                            event_type = data.get("event_type")
+                            if event_type == "step.delta":
+                                delta = data.get("delta", {})
+                                if delta.get("type") == "text" and delta.get("text"):
+                                    yield delta["text"]
+                        except Exception:
+                            pass
+
+    async def get_available_models(self) -> list[str]:
+        return ["gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+
+    async def validate_api_key(self) -> bool:
+        return await self._embedding_delegate.validate_api_key()
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        return await self._embedding_delegate.embed(texts, model)
+

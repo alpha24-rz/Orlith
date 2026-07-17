@@ -89,11 +89,31 @@ async def rewrite_query(
     ]
 
     try:
+        from services.ai.providers.gemini import InteractionsGeminiProvider
+        response_format = None
+        if isinstance(chat_provider, InteractionsGeminiProvider):
+            response_format = {
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "queries": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of 2 to 3 search query variations for RAG retrieval."
+                        }
+                    },
+                    "required": ["queries"]
+                }
+            }
+
         response = await chat_provider.generate_response(
             messages=prompt,
             model=model,
             temperature=0.3,
             max_tokens=256,
+            response_format=response_format,
         )
         response = response.strip()
 
@@ -101,7 +121,7 @@ async def rewrite_query(
         if db and workspace_id:
             try:
                 from services.cost_calculator import log_usage
-                provider_name = "openai" if "gpt" in model.lower() else ("anthropic" if "claude" in model.lower() else "ollama")
+                provider_name = "openai" if "gpt" in model.lower() else ("anthropic" if "claude" in model.lower() else ("gemini" if "gemini" in model.lower() else "ollama"))
                 await log_usage(
                     db=db,
                     workspace_id=workspace_id,
@@ -124,6 +144,8 @@ async def rewrite_query(
             ).strip()
 
         variants = json.loads(response)
+        if isinstance(variants, dict) and "queries" in variants:
+            variants = variants["queries"]
 
         if isinstance(variants, list) and all(isinstance(v, str) for v in variants):
             # Gabungkan: query asli selalu ada di posisi pertama

@@ -9,7 +9,7 @@ from models.credential import WorkspaceCredential
 from models.api_key import UserAPIKey
 from services.ai.providers.manager import ProviderManager
 from services.ai.providers import get_provider_adapter
-from services.ai.providers.gemini import GeminiProvider
+from services.ai.providers.gemini import GeminiProvider, InteractionsGeminiProvider
 from services.ai.providers.local_embedding import LocalEmbeddingProvider
 from core.security import decrypt_api_key
 import json
@@ -134,7 +134,11 @@ class LLMGateway:
                             logger.error(f"Failed to load user provider {provider_name} key: {e}")
 
             # 3. Fallback to system settings for Gemini
+            if provider_name in ("gemini_interactions", "gemini-interactions") and settings.GEMINI_API_KEY:
+                return InteractionsGeminiProvider(settings.GEMINI_API_KEY), model_name
             if provider_name == "gemini" and settings.GEMINI_API_KEY:
+                if getattr(settings, "GEMINI_USE_INTERACTIONS_API", False):
+                    return InteractionsGeminiProvider(settings.GEMINI_API_KEY), model_name
                 return GeminiProvider(settings.GEMINI_API_KEY), model_name
  
 
@@ -147,6 +151,8 @@ class LLMGateway:
 
         # Fallback to Gemini if configured and not offline
         if settings.GEMINI_API_KEY and gemini_health.state != "Offline":
+            if getattr(settings, "GEMINI_USE_INTERACTIONS_API", False):
+                return InteractionsGeminiProvider(settings.GEMINI_API_KEY), "gemini-3.5-flash"
             return GeminiProvider(settings.GEMINI_API_KEY), "gemini-1.5-flash"
 
         # Fallback to OpenRouter (OpenAI fallback)

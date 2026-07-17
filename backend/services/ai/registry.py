@@ -38,6 +38,8 @@ NATIVE_MODELS = {
         {"id": "claude-3-haiku-20240307", "display_name": "Claude 3 Haiku", "context_window": 200000},
     ],
     "gemini": [
+        {"id": "gemini-3.5-flash", "display_name": "Gemini 3.5 Flash", "context_window": 1000000},
+        {"id": "gemini-3.1-flash-image", "display_name": "Gemini 3.1 Flash Image", "context_window": 1000000},
         {"id": "gemini-2.0-flash", "display_name": "Gemini 2.0 Flash", "context_window": 1000000},
         {"id": "gemini-1.5-pro", "display_name": "Gemini 1.5 Pro", "context_window": 2000000},
         {"id": "gemini-1.5-flash", "display_name": "Gemini 1.5 Flash", "context_window": 1000000},
@@ -129,7 +131,7 @@ class ModelRegistry:
 
         # 5. Add Gemini models (always add if system-level GEMINI_API_KEY is configured)
         from core.config import settings
-        if "gemini" in connected_providers or settings.GEMINI_API_KEY:
+        if "gemini" in connected_providers or "gemini_interactions" in connected_providers or settings.GEMINI_API_KEY:
             for m in NATIVE_MODELS["gemini"]:
                 models.append(
                     ModelInfo(

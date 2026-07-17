@@ -4,9 +4,9 @@ from .openai import OpenAIProvider
 from .anthropic import AnthropicProvider
 from .ollama import OllamaProvider
 from .openrouter import OpenRouterProvider
-from .gemini import GeminiProvider
+from .gemini import GeminiProvider, InteractionsGeminiProvider
 
-SUPPORTED_PROVIDERS = ["openai", "anthropic", "ollama", "openrouter", "gemini"]
+SUPPORTED_PROVIDERS = ["openai", "anthropic", "ollama", "openrouter", "gemini", "gemini_interactions"]
 
 class ProviderManager:
     @staticmethod
@@ -31,7 +31,15 @@ class ProviderManager:
             api_key = credential_json.get("api_key")
             if not api_key:
                 raise ValueError("Gemini requires an api_key in credentials")
+            if credential_json.get("use_interactions_api"):
+                return InteractionsGeminiProvider(api_key)
             return GeminiProvider(api_key)
+            
+        elif provider_name in ("gemini_interactions", "gemini-interactions"):
+            api_key = credential_json.get("api_key")
+            if not api_key:
+                raise ValueError("Gemini Interactions requires an api_key in credentials")
+            return InteractionsGeminiProvider(api_key)
             
         elif provider_name == "ollama":
             api_key_or_url = credential_json.get("base_url") or credential_json.get("api_key")
