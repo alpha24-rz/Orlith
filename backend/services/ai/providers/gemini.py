@@ -2,6 +2,9 @@ from .base import ILLMProvider, IEmbeddingProvider
 from typing import AsyncIterator
 import httpx
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GeminiProvider(ILLMProvider, IEmbeddingProvider):
     def __init__(self, api_key: str):
@@ -13,6 +16,36 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             "Content-Type": "application/json",
         }
 
+    def _clean_model_name(self, model: str) -> str:
+        if not model or model == "default" or model == "gemini":
+            return "gemini-1.5-flash"
+        return model.replace("models/", "")
+
+    def _format_messages_for_native(self, messages: list[dict]) -> list[dict]:
+        contents = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            native_role = "model" if role in ("assistant", "model") else "user"
+            if role == "system":
+                contents.append({
+                    "role": "user",
+                    "parts": [{"text": f"[System Instructions]: {content}"}]
+                })
+            else:
+                contents.append({
+                    "role": native_role,
+                    "parts": [{"text": str(content)}]
+                })
+        # Merge adjacent messages of the same role
+        merged = []
+        for c in contents:
+            if merged and merged[-1]["role"] == c["role"]:
+                merged[-1]["parts"][0]["text"] += "\n\n" + c["parts"][0]["text"]
+            else:
+                merged.append(c)
+        return merged
+
     async def generate_response(
         self,
         messages: list[dict],
@@ -21,20 +54,51 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         max_tokens: int = 2048,
         **kwargs,
     ) -> str:
+        clean_model = self._clean_model_name(model)
         payload = {
-            "model": model,
+            "model": clean_model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"{self.base_url}/chat/completions",
-                json=payload,
-                headers=self.headers,
+            try:
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=self.headers,
+                )
+                if resp.status_code == 200:
+                    return resp.json()["choices"][0]["message"]["content"]
+            except Exception as e:
+                logger.debug(f"OpenAI compatible endpoint failed ({e}), trying native generateContent")
+
+            # Fallback to Google AI Studio native generateContent endpoint
+            native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
+            native_headers = {
+                "x-goog-api-key": self.api_key,
+                "Content-Type": "application/json",
+            }
+            native_payload = {
+                "contents": self._format_messages_for_native(messages),
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": max_tokens,
+                }
+            }
+            resp_native = await client.post(
+                native_url,
+                json=native_payload,
+                headers=native_headers,
             )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            resp_native.raise_for_status()
+            data = resp_native.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                texts = [p.get("text", "") for p in parts if "text" in p]
+                return "\n".join(texts)
+            return ""
 
     async def stream_response(
         self,
@@ -44,8 +108,9 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         max_tokens: int = 2048,
         **kwargs,
     ) -> AsyncIterator[str]:
+        clean_model = self._clean_model_name(model)
         payload = {
-            "model": model,
+            "model": clean_model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -53,26 +118,69 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         }
 
         async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}/chat/completions",
-                json=payload,
-                headers=self.headers,
-            ) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if line.startswith("data: ") and line != "data: [DONE]":
-                        try:
-                            chunk = json.loads(line[6:])
-                            content = (
-                                chunk.get("choices", [{}])[0]
-                                .get("delta", {})
-                                .get("content", "")
-                            )
-                            if content:
-                                yield content
-                        except Exception:
-                            pass
+            use_native = False
+            try:
+                req = client.build_request(
+                    "POST",
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers=self.headers,
+                )
+                resp = await client.send(req, stream=True)
+                if resp.status_code != 200:
+                    await resp.aclose()
+                    use_native = True
+                else:
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            try:
+                                chunk = json.loads(line[6:])
+                                content = (
+                                    chunk.get("choices", [{}])[0]
+                                    .get("delta", {})
+                                    .get("content", "")
+                                )
+                                if content:
+                                    yield content
+                            except Exception:
+                                pass
+                    await resp.aclose()
+            except Exception:
+                use_native = True
+
+            # Fallback to Google AI Studio native streamGenerateContent endpoint
+            if use_native:
+                native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:streamGenerateContent?alt=sse"
+                native_headers = {
+                    "x-goog-api-key": self.api_key,
+                    "Content-Type": "application/json",
+                }
+                native_payload = {
+                    "contents": self._format_messages_for_native(messages),
+                    "generationConfig": {
+                        "temperature": temperature,
+                        "maxOutputTokens": max_tokens,
+                    }
+                }
+                async with client.stream(
+                    "POST",
+                    native_url,
+                    json=native_payload,
+                    headers=native_headers,
+                ) as native_resp:
+                    native_resp.raise_for_status()
+                    async for line in native_resp.aiter_lines():
+                        if line.startswith("data: "):
+                            try:
+                                chunk = json.loads(line[6:])
+                                candidates = chunk.get("candidates", [])
+                                if candidates:
+                                    parts = candidates[0].get("content", {}).get("parts", [])
+                                    for p in parts:
+                                        if "text" in p and p["text"]:
+                                            yield p["text"]
+                            except Exception:
+                                pass
 
     async def get_available_models(self) -> list[str]:
         return ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
@@ -166,6 +274,11 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                     })
         return formatted_input
 
+    def _clean_model_name(self, model: str) -> str:
+        if not model or model == "default" or model == "gemini":
+            return "gemini-3.5-flash"
+        return model.replace("models/", "")
+
     async def generate_response(
         self,
         messages: list[dict],
@@ -180,9 +293,10 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         response_format = kwargs.get("response_format")
         background = kwargs.get("background", False)
 
+        clean_model = self._clean_model_name(model)
         input_data = self._prepare_input(messages, previous_interaction_id, store)
         payload = {
-            "model": model,
+            "model": clean_model,
             "input": input_data,
         }
         if previous_interaction_id:
@@ -232,9 +346,10 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         tools = kwargs.get("tools")
         response_format = kwargs.get("response_format")
 
+        clean_model = self._clean_model_name(model)
         input_data = self._prepare_input(messages, previous_interaction_id, store)
         payload = {
-            "model": model,
+            "model": clean_model,
             "input": input_data,
             "stream": True,
         }
