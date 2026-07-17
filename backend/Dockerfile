@@ -16,8 +16,12 @@ COPY requirements.txt .
 # This prevents pip from pulling down massive CUDA wheels during requirements installation.
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining dependencies from official PyPI CDN at high speed
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
+# Install heavy scientific & ML packages separately with CPU fallback to optimize layer caching
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    numpy scipy Pillow opencv-python-headless easyocr sentence-transformers chromadb
+
+# Install remaining dependencies from official PyPI CDN at high speed with CPU fallback
+RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 COPY . .
 
