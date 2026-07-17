@@ -130,11 +130,11 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
         )}
       </div>
 
-      {/* ── Workspace switcher ── */}
-      <div ref={workspaceRef} className="p-3 border-b border-border-subtle relative z-20">
+      {/* ── Workspace switcher & Global Search Icon ── */}
+      <div ref={workspaceRef} className={`p-3 border-b border-border-subtle relative z-20 flex ${isCollapsed ? 'flex-col items-center gap-2.5' : 'items-center justify-between gap-1.5'}`}>
         <button
           onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-hover transition-colors min-w-0"
+          className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-bg-hover transition-colors min-w-0"
           title={isCollapsed && activeWorkspace ? activeWorkspace.name : undefined}
         >
           {activeWorkspace ? (
@@ -163,10 +163,18 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           />
         </button>
 
+        <button
+          onClick={onOpenCommandPalette}
+          className="p-2 rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-all flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs"
+          title="Search (⌘K)"
+        >
+          <Search className="w-4 h-4 shrink-0" />
+        </button>
+
         {workspaceMenuOpen && (
           <div
-            className={`absolute ${isCollapsed ? 'left-full ml-2 w-48' : 'left-3 right-3'
-              } mt-1 rounded-xl border border-border-strong bg-bg-panel shadow-xl overflow-hidden animate-fade-in`}
+            className={`absolute ${isCollapsed ? 'left-full ml-2 top-2 w-48' : 'left-3 right-3 top-full mt-1'
+              } rounded-xl border border-border-strong bg-bg-panel shadow-xl overflow-hidden animate-fade-in z-50`}
           >
             {workspaces.map(w => (
               <button
@@ -197,26 +205,6 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── Global Search ── */}
-      <div className="px-3 py-3 border-b border-border-subtle">
-        <div
-          onClick={onOpenCommandPalette}
-          className="flex items-center gap-2 rounded-xl bg-bg-input/80 hover:bg-bg-input transition-all cursor-pointer select-none group/search px-3 py-2 min-w-0"
-          title={isCollapsed ? 'Search (Cmd+K)' : undefined}
-        >
-          <Search className="w-4 h-4 text-text-muted group-hover/search:text-indigo-400 shrink-0 transition-colors" />
-          <span className={`text-xs text-text-muted group-hover/search:text-foreground/60 transition-colors truncate ${labelClass}`}>
-            Search...
-          </span>
-          <kbd
-            className={`ml-auto text-[10px] text-text-muted bg-bg-hover border border-border-strong px-1.5 py-0.5 rounded shrink-0 group-hover/search:border-indigo-500/30 transition-all duration-300 ${isCollapsed ? 'opacity-0 max-w-0 overflow-hidden p-0' : 'opacity-100 delay-100'
-              }`}
-          >
-            ⌘K
-          </kbd>
-        </div>
       </div>
 
       {/* ── Main nav (Fixed & Non-scrolling) ── */}
