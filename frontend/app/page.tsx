@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, EyeOff, ArrowRight, User } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, User, AlertTriangle, RefreshCw, CheckCircle2 } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
@@ -16,8 +16,10 @@ export default function AuthPage() {
   const [agreedToTerms, setAgreedToTerms] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [mounted, setMounted] = useState(false)
-  console.log("HELLO FROM CLIENT", { mounted })
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  const [backendStatus, setBackendStatus] = useState<"checking" | "online" | "maintenance">("checking")
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -30,8 +32,28 @@ export default function AuthPage() {
   const setAuth = useAuthStore((state) => state.setAuth)
   const { setTheme } = useTheme()
 
+  const checkBackendHealth = async () => {
+    setIsCheckingHealth(true)
+    setBackendStatus("checking")
+    try {
+      const res = await axiosClient.get('/health', { timeout: 6000 })
+      if (res.data?.status === "healthy") {
+        setBackendStatus("online")
+      } else {
+        setBackendStatus("maintenance")
+      }
+    } catch (err) {
+      setBackendStatus("maintenance")
+    } finally {
+      setIsCheckingHealth(false)
+    }
+  }
+
   useEffect(() => {
     setTheme("dark")
+    checkBackendHealth()
+    const healthTimer = setInterval(checkBackendHealth, 15000)
+    return () => clearInterval(healthTimer)
   }, [setTheme])
 
   const handleDemoAccess = async () => {
@@ -44,11 +66,16 @@ export default function AuthPage() {
       router.push('/dashboard/chat')
     } catch (err: any) {
       console.error(err)
-      setError(
-        err.response?.data?.detail ||
-        err.response?.data?.error ||
-        'Failed to access as Guest. Please try again.'
-      )
+      if (err.code === 'ERR_NETWORK' || err.response?.status >= 500 || err.response?.status === 503 || err.response?.status === 504 || err.message?.includes('Network Error')) {
+        setBackendStatus("maintenance")
+        setError("⚠️ Server AI sedang dalam pemeliharaan atau proses start-up. Silakan tunggu beberapa saat lagi atau klik 'Cek Status' di atas.")
+      } else {
+        setError(
+          err.response?.data?.detail ||
+          err.response?.data?.error ||
+          'Failed to access as Guest. Please try again.'
+        )
+      }
     } finally {
       setLoading(false)
     }
@@ -128,11 +155,16 @@ export default function AuthPage() {
       }
     } catch (err: any) {
       console.error(err)
-      setError(
-        err.response?.data?.detail ||
-        err.response?.data?.error ||
-        (isSignUp ? 'Registration failed. Please try again.' : 'Incorrect email or password. Please try again.')
-      )
+      if (err.code === 'ERR_NETWORK' || err.response?.status >= 500 || err.response?.status === 503 || err.response?.status === 504 || err.message?.includes('Network Error')) {
+        setBackendStatus("maintenance")
+        setError("⚠️ Server AI sedang dalam pemeliharaan atau proses start-up. Silakan tunggu beberapa saat lagi atau klik 'Cek Status' di atas.")
+      } else {
+        setError(
+          err.response?.data?.detail ||
+          err.response?.data?.error ||
+          (isSignUp ? 'Registration failed. Please try again.' : 'Incorrect email or password. Please try again.')
+        )
+      }
     } finally {
       setLoading(false)
     }
@@ -165,6 +197,28 @@ export default function AuthPage() {
             <div className="text-foreground text-xl font-bold tracking-wider flex gap-2">
               <img className="w-6" src="./logo_dark.svg" alt="" />
               <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">ORLITH</span>
+            </div>
+
+            {/* Live Backend Status Badge */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-bg-input/80 border border-border-subtle text-xs font-medium shadow-sm backdrop-blur-md">
+              {backendStatus === "checking" && (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 text-text-muted animate-spin" />
+                  <span className="text-text-muted">Checking AI...</span>
+                </>
+              )}
+              {backendStatus === "online" && (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-green-400">AI Engine Ready</span>
+                </>
+              )}
+              {backendStatus === "maintenance" && (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-amber-400 font-semibold">AI Maintenance</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -245,6 +299,36 @@ export default function AuthPage() {
               </button>
             </p>
           </div>
+
+          {/* Maintenance / Building Banner */}
+          {backendStatus === "maintenance" && (
+            <div className={`mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 backdrop-blur-md flex items-start gap-3.5 text-amber-200 shadow-lg shadow-amber-500/5 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 mt-0.5 shrink-0">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="text-sm flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-semibold text-amber-300 flex items-center gap-1.5">
+                    Server AI Sedang Pemeliharaan / Starting
+                  </h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    Auto-retry 15s
+                  </span>
+                </div>
+                <p className="text-amber-200/80 mt-1 text-xs leading-relaxed">
+                  Sistem backend ORLITH (Hugging Face Space) saat ini sedang dalam status <strong className="text-amber-300">Building / Starting Up</strong>. Fitur login dan dokumen akan aktif otomatis beberapa saat lagi.
+                </p>
+                <button
+                  type="button"
+                  onClick={checkBackendHealth}
+                  className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 hover:text-amber-100 underline underline-offset-4 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isCheckingHealth ? "animate-spin" : ""}`} />
+                  Cek Ulang Status Sekarang
+                </button>
+              </div>
+            </div>
+          )}
 
           <form className="space-y-3" onSubmit={handleSubmit}>
             {error && (

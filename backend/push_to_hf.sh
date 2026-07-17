@@ -48,8 +48,13 @@ find . -name '.pytest_cache' -type d -exec rm -rf {} + 2>/dev/null || true
 
 
 echo "=== Staging and Committing ==="
-git config user.name "Alpha ORLITH"
-git config user.email "alpha24@users.noreply.huggingface.co"
+git_name="$(git -C "$OLDPWD" config user.name 2>/dev/null || echo "alpha24-rz")"
+if [ -z "$git_name" ]; then git_name="alpha24-rz"; fi
+git_email="$(git -C "$OLDPWD" config user.email 2>/dev/null || echo "alfakiddrock7@gmail.com")"
+if [ -z "$git_email" ]; then git_email="alfakiddrock7@gmail.com"; fi
+
+git config user.name "$git_name"
+git config user.email "$git_email"
 git add -A
 if git commit -m "$commit_msg"; then
     echo "=== Pushing to Hugging Face Spaces ==="

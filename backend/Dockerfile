@@ -12,16 +12,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 
-# Install lightweight CPU-only PyTorch first (~150MB instead of 2.2GB CUDA PyTorch)
-# This prevents pip from pulling down massive CUDA wheels during requirements installation.
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# Install heavy scientific & ML packages separately with CPU fallback to optimize layer caching
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
-    numpy scipy Pillow opencv-python-headless easyocr sentence-transformers chromadb
-
-# Install remaining dependencies from official PyPI CDN at high speed with CPU fallback
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# Install dependencies from high-speed CDN mirror with retries
+RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple --default-timeout=1000 --retries 10 -r requirements.txt
 
 COPY . .
 
