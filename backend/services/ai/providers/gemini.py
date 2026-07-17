@@ -13,6 +13,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
+            "x-goog-api-key": self.api_key,
             "Content-Type": "application/json",
         }
 
@@ -55,16 +56,21 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         **kwargs,
     ) -> str:
         clean_model = self._clean_model_name(model)
-        payload = {
-            "model": clean_model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
+        models_to_try = [clean_model]
+        if clean_model not in ("gemini-2.0-flash", "gemini-1.5-flash-latest"):
+            models_to_try.extend(["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"])
+
         async with httpx.AsyncClient(timeout=60) as client:
+            # First try OpenAI compatible endpoint
+            payload = {
+                "model": clean_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
             try:
                 resp = await client.post(
-                    f"{self.base_url}/chat/completions",
+                    f"{self.base_url}/chat/completions?key={self.api_key}",
                     json=payload,
                     headers=self.headers,
                 )
@@ -73,31 +79,40 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             except Exception as e:
                 logger.debug(f"OpenAI compatible endpoint failed ({e}), trying native generateContent")
 
-            # Fallback to Google AI Studio native generateContent endpoint
-            native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
-            native_headers = {
-                "x-goog-api-key": self.api_key,
-                "Content-Type": "application/json",
-            }
-            native_payload = {
-                "contents": self._format_messages_for_native(messages),
-                "generationConfig": {
-                    "temperature": temperature,
-                    "maxOutputTokens": max_tokens,
+            # Fallback to Google AI Studio native generateContent endpoint with model retry for 404s
+            last_err = None
+            for m in models_to_try:
+                native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={self.api_key}"
+                native_payload = {
+                    "contents": self._format_messages_for_native(messages),
+                    "generationConfig": {
+                        "temperature": temperature,
+                        "maxOutputTokens": max_tokens,
+                    }
                 }
-            }
-            resp_native = await client.post(
-                native_url,
-                json=native_payload,
-                headers=native_headers,
-            )
-            resp_native.raise_for_status()
-            data = resp_native.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                texts = [p.get("text", "") for p in parts if "text" in p]
-                return "\n".join(texts)
+                try:
+                    resp_native = await client.post(
+                        native_url,
+                        json=native_payload,
+                        headers=self.headers,
+                    )
+                    if resp_native.status_code == 404:
+                        logger.warning(f"Model {m} returned 404 Not Found on generateContent, trying alternative model...")
+                        continue
+                    resp_native.raise_for_status()
+                    data = resp_native.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        texts = [p.get("text", "") for p in parts if "text" in p]
+                        return "\n".join(texts)
+                    return ""
+                except Exception as e:
+                    last_err = e
+                    continue
+
+            if last_err:
+                raise last_err
             return ""
 
     async def stream_response(
@@ -109,20 +124,23 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         **kwargs,
     ) -> AsyncIterator[str]:
         clean_model = self._clean_model_name(model)
-        payload = {
-            "model": clean_model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
+        models_to_try = [clean_model]
+        if clean_model not in ("gemini-2.0-flash", "gemini-1.5-flash-latest"):
+            models_to_try.extend(["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"])
 
         async with httpx.AsyncClient(timeout=60) as client:
             use_native = False
+            payload = {
+                "model": clean_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True,
+            }
             try:
                 req = client.build_request(
                     "POST",
-                    f"{self.base_url}/chat/completions",
+                    f"{self.base_url}/chat/completions?key={self.api_key}",
                     json=payload,
                     headers=self.headers,
                 )
@@ -148,39 +166,47 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             except Exception:
                 use_native = True
 
-            # Fallback to Google AI Studio native streamGenerateContent endpoint
+            # Fallback to Google AI Studio native streamGenerateContent endpoint with model retry for 404s
             if use_native:
-                native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:streamGenerateContent?alt=sse"
-                native_headers = {
-                    "x-goog-api-key": self.api_key,
-                    "Content-Type": "application/json",
-                }
-                native_payload = {
-                    "contents": self._format_messages_for_native(messages),
-                    "generationConfig": {
-                        "temperature": temperature,
-                        "maxOutputTokens": max_tokens,
+                for m in models_to_try:
+                    native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:streamGenerateContent?key={self.api_key}&alt=sse"
+                    native_payload = {
+                        "contents": self._format_messages_for_native(messages),
+                        "generationConfig": {
+                            "temperature": temperature,
+                            "maxOutputTokens": max_tokens,
+                        }
                     }
-                }
-                async with client.stream(
-                    "POST",
-                    native_url,
-                    json=native_payload,
-                    headers=native_headers,
-                ) as native_resp:
-                    native_resp.raise_for_status()
-                    async for line in native_resp.aiter_lines():
-                        if line.startswith("data: "):
-                            try:
-                                chunk = json.loads(line[6:])
-                                candidates = chunk.get("candidates", [])
-                                if candidates:
-                                    parts = candidates[0].get("content", {}).get("parts", [])
-                                    for p in parts:
-                                        if "text" in p and p["text"]:
-                                            yield p["text"]
-                            except Exception:
-                                pass
+                    try:
+                        req_native = client.build_request(
+                            "POST",
+                            native_url,
+                            json=native_payload,
+                            headers=self.headers,
+                        )
+                        native_resp = await client.send(req_native, stream=True)
+                        if native_resp.status_code == 404:
+                            await native_resp.aclose()
+                            logger.warning(f"Model {m} returned 404 Not Found on streamGenerateContent, trying alternative model...")
+                            continue
+                        native_resp.raise_for_status()
+                        async for line in native_resp.aiter_lines():
+                            if line.startswith("data: "):
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    candidates = chunk.get("candidates", [])
+                                    if candidates:
+                                        parts = candidates[0].get("content", {}).get("parts", [])
+                                        for p in parts:
+                                            if "text" in p and p["text"]:
+                                                yield p["text"]
+                                except Exception:
+                                    pass
+                        await native_resp.aclose()
+                        break
+                    except Exception as e:
+                        logger.error(f"Error streaming from {m}: {e}")
+                        continue
 
     async def get_available_models(self) -> list[str]:
         return ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
@@ -189,7 +215,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(
-                    f"{self.base_url}/models",
+                    f"{self.base_url}/models?key={self.api_key}",
                     headers=self.headers,
                 )
                 return resp.status_code == 200
@@ -197,8 +223,6 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             return False
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
-        # Map models/gemini-embedding-001 or other models to text-embedding-004
-        # which is supported in the OpenAI compatibility endpoint
         embedding_model = model
         if not embedding_model or embedding_model == "default" or "gemini-embedding-001" in embedding_model:
             embedding_model = "text-embedding-004"
@@ -211,7 +235,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         }
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
-                f"{self.base_url}/embeddings",
+                f"{self.base_url}/embeddings?key={self.api_key}",
                 json=payload,
                 headers=self.headers,
             )
@@ -236,6 +260,7 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/interactions"
         self.headers = {
             "x-goog-api-key": self.api_key,
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         self._embedding_delegate = GeminiProvider(api_key)
@@ -312,7 +337,7 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
 
         async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(
-                self.base_url,
+                f"{self.base_url}?key={self.api_key}",
                 json=payload,
                 headers=self.headers,
             )
@@ -365,7 +390,7 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         async with httpx.AsyncClient(timeout=90) as client:
             async with client.stream(
                 "POST",
-                f"{self.base_url}?alt=sse",
+                f"{self.base_url}?key={self.api_key}&alt=sse",
                 json=payload,
                 headers=self.headers,
             ) as resp:
@@ -390,4 +415,5 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         return await self._embedding_delegate.embed(texts, model)
+
 
