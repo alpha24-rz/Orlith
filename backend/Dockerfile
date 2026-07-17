@@ -12,8 +12,23 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 
-# Install dependencies from high-speed CDN mirror with retries
-RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple --default-timeout=1000 --retries 10 -r requirements.txt
+# Install lightweight CPU PyTorch (~150MB instead of 2.3GB CUDA) first.
+# This layer finishes in ~2 minutes and will be CACHED PERMANENTLY by Docker!
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Install heavy scientific & pre-compiled ML wheels in a separate layer.
+# Separating this layer prevents long builds and timeouts. Once completed, CACHED PERMANENTLY!
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    numpy scipy Pillow opencv-python-headless scikit-image chromadb sentence-transformers easyocr
+
+# Install remaining fast requirements from requirements.txt (FastAPI, pydantic, uvicorn, langchain, etc.)
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 \
+    --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements.txt
 
 COPY . .
 
