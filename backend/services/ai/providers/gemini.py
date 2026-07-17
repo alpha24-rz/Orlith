@@ -12,14 +12,16 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         # Use Gemini's OpenAI-compatible endpoint
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "x-goog-api-key": self.api_key,
             "Content-Type": "application/json",
         }
+        # Only attach Authorization Bearer if it is explicitly an OAuth access token (ya29.)
+        if self.api_key.startswith("ya29."):
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
 
     def _clean_model_name(self, model: str) -> str:
         if not model or model == "default" or model == "gemini":
-            return "gemini-1.5-flash"
+            return "gemini-2.5-flash"
         return model.replace("models/", "")
 
     def _format_messages_for_native(self, messages: list[dict]) -> list[dict]:
@@ -56,30 +58,35 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         **kwargs,
     ) -> str:
         clean_model = self._clean_model_name(model)
-        models_to_try = [clean_model]
-        if clean_model not in ("gemini-2.0-flash", "gemini-1.5-flash-latest"):
-            models_to_try.extend(["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"])
+        models_to_try = []
+        for m in [clean_model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]:
+            if m not in models_to_try:
+                models_to_try.append(m)
 
         async with httpx.AsyncClient(timeout=60) as client:
-            # First try OpenAI compatible endpoint
-            payload = {
-                "model": clean_model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
-            try:
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions?key={self.api_key}",
-                    json=payload,
-                    headers=self.headers,
-                )
-                if resp.status_code == 200:
-                    return resp.json()["choices"][0]["message"]["content"]
-            except Exception as e:
-                logger.debug(f"OpenAI compatible endpoint failed ({e}), trying native generateContent")
+            # First try OpenAI compatible endpoint if using standard AIza key or OAuth token
+            if self.api_key.startswith("AIza") or self.api_key.startswith("ya29."):
+                payload = {
+                    "model": clean_model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                headers_openai = dict(self.headers)
+                if "Authorization" not in headers_openai and self.api_key.startswith("AIza"):
+                    headers_openai["Authorization"] = f"Bearer {self.api_key}"
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}/chat/completions?key={self.api_key}",
+                        json=payload,
+                        headers=headers_openai,
+                    )
+                    if resp.status_code == 200:
+                        return resp.json()["choices"][0]["message"]["content"]
+                except Exception as e:
+                    logger.debug(f"OpenAI compatible endpoint failed ({e}), trying native generateContent")
 
-            # Fallback to Google AI Studio native generateContent endpoint with model retry for 404s
+            # Fallback to Google AI Studio native generateContent endpoint with model retry for 404s/401s
             last_err = None
             for m in models_to_try:
                 native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={self.api_key}"
@@ -96,8 +103,8 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                         json=native_payload,
                         headers=self.headers,
                     )
-                    if resp_native.status_code == 404:
-                        logger.warning(f"Model {m} returned 404 Not Found on generateContent, trying alternative model...")
+                    if resp_native.status_code in (404, 401, 400) and m != models_to_try[-1]:
+                        logger.warning(f"Model {m} returned {resp_native.status_code} on generateContent, trying alternative model...")
                         continue
                     resp_native.raise_for_status()
                     data = resp_native.json()
@@ -124,49 +131,55 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
         **kwargs,
     ) -> AsyncIterator[str]:
         clean_model = self._clean_model_name(model)
-        models_to_try = [clean_model]
-        if clean_model not in ("gemini-2.0-flash", "gemini-1.5-flash-latest"):
-            models_to_try.extend(["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"])
+        models_to_try = []
+        for m in [clean_model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]:
+            if m not in models_to_try:
+                models_to_try.append(m)
 
         async with httpx.AsyncClient(timeout=60) as client:
-            use_native = False
-            payload = {
-                "model": clean_model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "stream": True,
-            }
-            try:
-                req = client.build_request(
-                    "POST",
-                    f"{self.base_url}/chat/completions?key={self.api_key}",
-                    json=payload,
-                    headers=self.headers,
-                )
-                resp = await client.send(req, stream=True)
-                if resp.status_code != 200:
-                    await resp.aclose()
+            use_native = True
+            if self.api_key.startswith("AIza") or self.api_key.startswith("ya29."):
+                use_native = False
+                payload = {
+                    "model": clean_model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                }
+                headers_openai = dict(self.headers)
+                if "Authorization" not in headers_openai and self.api_key.startswith("AIza"):
+                    headers_openai["Authorization"] = f"Bearer {self.api_key}"
+                try:
+                    req = client.build_request(
+                        "POST",
+                        f"{self.base_url}/chat/completions?key={self.api_key}",
+                        json=payload,
+                        headers=headers_openai,
+                    )
+                    resp = await client.send(req, stream=True)
+                    if resp.status_code != 200:
+                        await resp.aclose()
+                        use_native = True
+                    else:
+                        async for line in resp.aiter_lines():
+                            if line.startswith("data: ") and line != "data: [DONE]":
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    content = (
+                                        chunk.get("choices", [{}])[0]
+                                        .get("delta", {})
+                                        .get("content", "")
+                                    )
+                                    if content:
+                                        yield content
+                                except Exception:
+                                    pass
+                        await resp.aclose()
+                except Exception:
                     use_native = True
-                else:
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: ") and line != "data: [DONE]":
-                            try:
-                                chunk = json.loads(line[6:])
-                                content = (
-                                    chunk.get("choices", [{}])[0]
-                                    .get("delta", {})
-                                    .get("content", "")
-                                )
-                                if content:
-                                    yield content
-                            except Exception:
-                                pass
-                    await resp.aclose()
-            except Exception:
-                use_native = True
 
-            # Fallback to Google AI Studio native streamGenerateContent endpoint with model retry for 404s
+            # Fallback to Google AI Studio native streamGenerateContent endpoint with model retry for 404s/401s
             if use_native:
                 for m in models_to_try:
                     native_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:streamGenerateContent?key={self.api_key}&alt=sse"
@@ -185,9 +198,9 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                             headers=self.headers,
                         )
                         native_resp = await client.send(req_native, stream=True)
-                        if native_resp.status_code == 404:
+                        if native_resp.status_code in (404, 401, 400) and m != models_to_try[-1]:
                             await native_resp.aclose()
-                            logger.warning(f"Model {m} returned 404 Not Found on streamGenerateContent, trying alternative model...")
+                            logger.warning(f"Model {m} returned {native_resp.status_code} on streamGenerateContent, trying alternative model...")
                             continue
                         native_resp.raise_for_status()
                         async for line in native_resp.aiter_lines():
@@ -209,7 +222,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                         continue
 
     async def get_available_models(self) -> list[str]:
-        return ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        return ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
     async def validate_api_key(self) -> bool:
         try:
@@ -260,9 +273,10 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/interactions"
         self.headers = {
             "x-goog-api-key": self.api_key,
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key.startswith("ya29."):
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
         self._embedding_delegate = GeminiProvider(api_key)
 
     def _prepare_input(self, messages: list[dict], previous_interaction_id: str = None, store: bool = True) -> dict | list | str:
@@ -301,7 +315,7 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
 
     def _clean_model_name(self, model: str) -> str:
         if not model or model == "default" or model == "gemini":
-            return "gemini-3.5-flash"
+            return "gemini-2.5-flash"
         return model.replace("models/", "")
 
     async def generate_response(
@@ -408,7 +422,7 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                             pass
 
     async def get_available_models(self) -> list[str]:
-        return ["gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        return ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
     async def validate_api_key(self) -> bool:
         return await self._embedding_delegate.validate_api_key()
