@@ -126,6 +126,8 @@ class LLMGateway:
                     )
                     user_key = result.scalars().first()
                     if user_key:
+                        if user_key.is_active is False:
+                            raise ValueError(f"Provider '{provider_name}' is currently disabled in your API Keys settings.")
                         try:
                             raw_key = decrypt_api_key(user_key.encrypted_key)
                             adapter = get_provider_adapter(provider_name, raw_key)

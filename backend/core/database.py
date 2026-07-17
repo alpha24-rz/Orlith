@@ -78,6 +78,7 @@ async def init_db():
         "ALTER TABLE workspaces ADD COLUMN active_embedding_provider VARCHAR",
         "ALTER TABLE workspaces ADD COLUMN active_embedding_model VARCHAR",
         "ALTER TABLE chunks ADD COLUMN parent_content VARCHAR",
+        "ALTER TABLE user_api_keys ADD COLUMN is_active BOOLEAN DEFAULT TRUE",
     ]
 
     for sql in migrations:

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db
 from models import UserAPIKey, User
-from schemas import APIKeyCreate, APIKeyResponse
+from schemas import APIKeyCreate, APIKeyResponse, APIKeyToggle
 from core.security import encrypt_api_key, decrypt_api_key, mask_api_key
 from services.ai.providers import get_provider_adapter, SUPPORTED_PROVIDERS
 from api.deps import get_current_user
@@ -61,6 +61,7 @@ async def save_api_key(
     if existing:
         existing.encrypted_key = encrypted
         existing.nickname = payload.nickname or existing.nickname
+        existing.is_active = True
         await db.commit()
         await db.refresh(existing)
         ModelRegistry.invalidate_cache(current_user.id)
@@ -69,6 +70,7 @@ async def save_api_key(
             provider=existing.provider,
             nickname=existing.nickname,
             masked_key=masked,
+            is_active=existing.is_active if existing.is_active is not None else True,
             created_at=existing.created_at,
         )
 
@@ -77,6 +79,7 @@ async def save_api_key(
         provider=payload.provider,
         nickname=payload.nickname,
         encrypted_key=encrypted,
+        is_active=True,
     )
     db.add(key_record)
     await db.commit()
@@ -88,6 +91,7 @@ async def save_api_key(
         provider=key_record.provider,
         nickname=key_record.nickname,
         masked_key=masked,
+        is_active=key_record.is_active if key_record.is_active is not None else True,
         created_at=key_record.created_at,
     )
 
@@ -108,12 +112,47 @@ async def list_api_keys(
             id=key.id,
             provider=key.provider,
             nickname=key.nickname,
-            # Decrypt only to re-mask; the raw value never leaves this function
             masked_key=_mask(decrypt_api_key(key.encrypted_key)),
+            is_active=key.is_active if key.is_active is not None else True,
             created_at=key.created_at,
         )
         for key in keys
     ]
+
+
+@router.patch("/{key_id}/toggle", response_model=APIKeyResponse)
+async def toggle_api_key(
+    key_id: str,
+    payload: APIKeyToggle,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle the active state of a stored API key."""
+    result = await db.execute(
+        select(UserAPIKey).where(
+            UserAPIKey.id == key_id,
+            UserAPIKey.user_id == current_user.id,
+        )
+    )
+    key_record = result.scalars().first()
+    if not key_record:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    key_record.is_active = payload.is_active
+    await db.commit()
+    await db.refresh(key_record)
+
+    from services.ai.registry import ModelRegistry
+    ModelRegistry.invalidate_cache(current_user.id)
+
+    return APIKeyResponse(
+        id=key_record.id,
+        provider=key_record.provider,
+        nickname=key_record.nickname,
+        masked_key=_mask(decrypt_api_key(key_record.encrypted_key)),
+        is_active=key_record.is_active if key_record.is_active is not None else True,
+        created_at=key_record.created_at,
+    )
 
 
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)

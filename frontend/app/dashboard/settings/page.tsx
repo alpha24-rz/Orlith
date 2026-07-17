@@ -242,6 +242,26 @@ export default function SettingsPage() {
     }
   }
 
+  const handleToggleApiKey = async (id: string, currentStatus: boolean) => {
+    try {
+      await axiosClient.patch(`/api-keys/${id}/toggle`, { is_active: !currentStatus })
+      fetchApiKeys()
+      fetchModels()
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to toggle API key status')
+    }
+  }
+
+  const handleToggleAllApiKeys = async (status: boolean) => {
+    try {
+      await Promise.all(apiKeys.map(k => axiosClient.patch(`/api-keys/${k.id}/toggle`, { is_active: status })))
+      fetchApiKeys()
+      fetchModels()
+    } catch (err: any) {
+      alert('Failed to update API keys status')
+    }
+  }
+
   const copyApiKey = () => {
     navigator.clipboard.writeText('dm_live_sk_1a2b3c4d5e6f7g8h9i0j')
     setApiKeyCopied(true)
@@ -785,7 +805,25 @@ export default function SettingsPage() {
       </div>
 
       <div className="rounded-2xl border border-border-strong bg-bg-input p-5">
-        <h3 className="text-sm font-bold mb-4">Connected API Keys</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold">Connected API Keys</h3>
+          {apiKeys.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleToggleAllApiKeys(true)}
+                className="px-2.5 py-1 text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg transition-colors"
+              >
+                Enable All
+              </button>
+              <button
+                onClick={() => handleToggleAllApiKeys(false)}
+                className="px-2.5 py-1 text-[10px] font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg transition-colors"
+              >
+                Disable All
+              </button>
+            </div>
+          )}
+        </div>
         {loadingApiKeys ? (
           <div className="text-xs text-text-muted animate-pulse">Loading keys...</div>
         ) : apiKeys.length === 0 ? (
@@ -795,12 +833,19 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-2">
             {apiKeys.map(k => (
-              <div key={k.id} className="flex items-center justify-between p-3 bg-bg-panel border border-border-strong rounded-xl">
+              <div key={k.id} className={`flex items-center justify-between p-3 bg-bg-panel border border-border-strong rounded-xl transition-all ${k.is_active === false ? 'opacity-60 bg-bg-input/50' : ''}`}>
                 <div>
                   <div className="text-sm font-bold text-foreground flex items-center gap-2 flex-wrap">
                     {k.nickname || k.provider}
                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-wider">{k.provider}</span>
                     {(() => {
+                      if (k.is_active === false) {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-text-muted bg-bg-hover border border-border-strong px-2 py-0.5 rounded-full font-medium" title="Provider models disabled">
+                            Disabled
+                          </span>
+                        )
+                      }
                       const statusInfo = keyStatuses[k.id];
                       if (!statusInfo) return null;
                       if (statusInfo.status === 'checking') {
@@ -832,10 +877,23 @@ export default function SettingsPage() {
                   </div>
                   <div className="text-xs text-text-muted mt-1 font-mono">{k.masked_key}</div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleApiKey(k.id, k.is_active !== false)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      k.is_active !== false ? 'bg-indigo-600' : 'bg-border-strong'
+                    }`}
+                    title={k.is_active !== false ? 'Click to Disable Provider' : 'Click to Enable Provider'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        k.is_active !== false ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                   <button
                     onClick={() => validateApiKey(k.id)}
-                    disabled={keyStatuses[k.id]?.status === 'checking'}
+                    disabled={keyStatuses[k.id]?.status === 'checking' || k.is_active === false}
                     className="p-2 text-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors disabled:opacity-50"
                     title="Test Connection"
                   >

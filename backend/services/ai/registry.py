@@ -73,8 +73,11 @@ class ModelRegistry:
             select(UserAPIKey).where(UserAPIKey.user_id == user_id)
         )
         api_keys = result.scalars().all()
+        disabled_providers = {key.provider for key in api_keys if key.is_active is False}
         connected_providers = {}
         for key in api_keys:
+            if key.is_active is False:
+                continue
             try:
                 connected_providers[key.provider] = decrypt_api_key(key.encrypted_key)
             except Exception as e:
@@ -129,20 +132,21 @@ class ModelRegistry:
                     )
                 )
 
-        # 5. Add Gemini models (always add if system-level GEMINI_API_KEY is configured)
+        # 5. Add Gemini models (if active via user key or system-level configuration and not explicitly disabled)
         from core.config import settings
-        if "gemini" in connected_providers or "gemini_interactions" in connected_providers or settings.GEMINI_API_KEY:
-            for m in NATIVE_MODELS["gemini"]:
-                models.append(
-                    ModelInfo(
-                        id=m["id"],
-                        display_name=m["display_name"],
-                        provider="gemini",
-                        context_window=m["context_window"],
-                        supports_streaming=True,
-                        is_available=True
+        if "gemini" not in disabled_providers and "gemini_interactions" not in disabled_providers:
+            if "gemini" in connected_providers or "gemini_interactions" in connected_providers or settings.GEMINI_API_KEY:
+                for m in NATIVE_MODELS["gemini"]:
+                    models.append(
+                        ModelInfo(
+                            id=m["id"],
+                            display_name=m["display_name"],
+                            provider="gemini",
+                            context_window=m["context_window"],
+                            supports_streaming=True,
+                            is_available=True
+                        )
                     )
-                )
 
         # 6. Add OpenRouter models dynamically
         if "openrouter" in connected_providers:

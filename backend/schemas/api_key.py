@@ -21,11 +21,16 @@ class APIKeyCreate(APIKeyBase):
     api_key: str
 
 
+class APIKeyToggle(BaseModel):
+    is_active: bool
+
+
 class APIKeyResponse(BaseModel):
     id: str
     provider: str
     nickname: Optional[str] = None
     masked_key: str
+    is_active: bool = True
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
