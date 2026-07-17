@@ -132,7 +132,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       <div ref={workspaceRef} className="border-b border-border-subtle relative z-20 flex items-center h-[52px] shrink-0 overflow-hidden">
         <button
           onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
-          className={`flex items-center h-full hover:bg-bg-hover transition-colors min-w-0 ${isCollapsed ? 'w-full justify-center' : 'flex-1'}`}
+          className="flex items-center justify-start h-full hover:bg-bg-hover transition-colors min-w-0 w-full overflow-hidden"
           title={isCollapsed && activeWorkspace ? activeWorkspace.name : undefined}
         >
           <div className="w-[72px] flex items-center justify-center shrink-0">
@@ -228,19 +228,15 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               key={item.href}
               href={item.href}
               id={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              onClick={() => setSidebarOpen?.(false)}
               title={isCollapsed ? item.label : undefined}
-              className={`relative flex items-center h-10 rounded-lg text-sm transition-colors duration-150 min-w-0 ${
-                isCollapsed ? 'mx-0 justify-center' : 'mx-0 pr-3'
-              } ${active
-                ? 'bg-white/5 text-foreground font-semibold'
-                : 'text-text-subtle hover:text-foreground hover:bg-bg-hover'
-                }`}
+              className={`relative flex items-center justify-start h-10 rounded-lg text-sm transition-colors duration-150 min-w-0 w-full overflow-hidden ${
+                active ? 'text-foreground font-semibold' : 'text-text-subtle hover:text-foreground hover:bg-bg-hover'
+              }`}
             >
               {active && (
                 <motion.div
                   layoutId="activeNavIndicator"
-                  className={`absolute inset-y-0 rounded-lg bg-white/5 border border-white/10 ${isCollapsed ? 'left-2 right-2' : 'inset-x-2'}`}
+                  className="absolute inset-y-0 left-2 right-2 rounded-lg bg-white/5 border border-white/10"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
