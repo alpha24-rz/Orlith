@@ -995,7 +995,9 @@ function ChatPageInner() {
   const user = useAuthStore(state => state.user)
   const token = useAuthStore(state => state.token)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(chatId)
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const [loadingThread, setLoadingThread] = useState(false)
+  const messagesCache = useRef<Record<string, ChatMessage[]>>({})
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(FALLBACK_MODELS[0])
@@ -1004,15 +1006,10 @@ function ChatPageInner() {
   const [modelSearch, setModelSearch] = useState('')
 
   useEffect(() => {
-    if (chatId !== activeConversationId) {
-      if (chatId) {
-        selectThread(chatId)
-      } else {
-        setActiveConversationId(null)
-        setMessages([])
-      }
+    if (activeConversationId && messages.length > 0) {
+      messagesCache.current[activeConversationId] = messages
     }
-  }, [chatId])
+  }, [activeConversationId, messages])
 
   useEffect(() => {
     if (!user?.id) return
@@ -1143,9 +1140,18 @@ function ChatPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
 
-  const selectThread = async (conversationId: string) => {
+  const selectThread = useCallback(async (conversationId: string) => {
     setActiveConversationId(conversationId)
-    setMessages([])
+    
+    // Instant optimistic render from local cache
+    if (messagesCache.current[conversationId]) {
+      setMessages(messagesCache.current[conversationId])
+      setLoadingThread(false)
+    } else {
+      setMessages([])
+      setLoadingThread(true)
+    }
+
     try {
       const headers: HeadersInit = {}
       const token = localStorage.getItem('auth_token')
@@ -1154,7 +1160,7 @@ function ChatPageInner() {
       const res = await fetch(`/api/conversations/${conversationId}/messages`, { headers })
       if (res.ok) {
         const data = await res.json()
-        const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+        const mappedMessages: ChatMessage[] = (data.messages || []).map((m: any) => ({
           id: m.id,
           role: m.role,
           content: m.content,
@@ -1166,12 +1172,27 @@ function ChatPageInner() {
           source_mode: m.metadata_json?.source_mode,
           retrieval_score: m.metadata_json?.retrieval_score,
         }))
+        messagesCache.current[conversationId] = mappedMessages
         setMessages(mappedMessages)
       }
     } catch (err) {
       console.error('Failed to load messages', err)
+    } finally {
+      setLoadingThread(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (chatId) {
+      if (chatId !== activeConversationId) {
+        selectThread(chatId)
+      }
+    } else {
+      setActiveConversationId(null)
+      setMessages([])
+      setLoadingThread(false)
+    }
+  }, [chatId, activeConversationId, selectThread])
 
   // Removed handleNewChat and deleteConversation as they are in SideBar now
 
@@ -1707,7 +1728,12 @@ function ChatPageInner() {
         {/* Messages */}
 
         <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col scrollbar-none">
-          {messages.length === 0 ? (
+          {loadingThread && messages.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-text-muted animate-pulse">
+              <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
+              <span className="text-xs font-semibold tracking-wide">Memuat percakapan...</span>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-6 py-12">
               {/* <img src="/logo_dark.svg" alt="" className='w-12 h-12' /> */}
 
@@ -2004,6 +2030,7 @@ function ChatPageInner() {
                 <button
                   key={conv.id}
                   onClick={() => {
+                    window.history.pushState(null, '', `/dashboard/chat?id=${conv.id}`);
                     selectThread(conv.id);
                     setHistoryDrawerOpen(false);
                   }}
