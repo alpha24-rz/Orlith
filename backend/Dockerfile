@@ -11,7 +11,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple --default-timeout=1000 --retries 10 -r requirements.txt
+
+# Install lightweight CPU-only PyTorch first (~150MB instead of 2.2GB CUDA PyTorch)
+# This prevents pip from pulling down massive CUDA wheels during requirements installation.
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining dependencies from official PyPI CDN at high speed
+RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt
 
 COPY . .
 
@@ -31,8 +37,8 @@ USER user
 
 EXPOSE 7860
 
-# Deep health check — verifies the /health endpoint is reachable
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Deep health check — verifies the /health endpoint is reachable with generous startup period for CPU inference
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:${PORT:-7860}/health || exit 1
 
 # Production: run without --reload, bind dynamically to PORT (defaulting to 7860)
