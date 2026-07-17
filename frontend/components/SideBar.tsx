@@ -219,8 +219,8 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
         </div>
       </div>
 
-      {/* ── Main nav ── */}
-      <nav className="flex-1 p-3 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
+      {/* ── Main nav (Fixed & Non-scrolling) ── */}
+      <div className="p-3 pb-2 flex flex-col gap-0.5 shrink-0">
         {NAV.map(item => {
           const active = pathname === item.href
           return (
@@ -240,55 +240,55 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
             </Link>
           )
         })}
+      </div>
 
-        {/* ── Recent Chats ── */}
-        <div className={`mt-4 transition-all duration-300 ${isCollapsed ? 'opacity-0 max-h-0 overflow-hidden' : 'opacity-100'}`}>
-          <div className="flex items-center justify-between px-3 mb-2">
-            <span className="text-xs font-bold text-foreground">Recent Chats</span>
-            <Link
-              href="/dashboard/chat"
-              onClick={() => setSidebarOpen?.(false)}
-              className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
-              title="New Chat"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {conversations.slice(0, 15).map(conv => {
-              const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
-              return (
-                <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover">
-                  <Link
-                    href={`/dashboard/chat?id=${conv.id}`}
-                    onClick={() => setSidebarOpen?.(false)}
-                    className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate text-xs">{conv.title}</div>
-                      <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
-                    </div>
-                  </Link>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (confirm('Hapus percakapan ini?')) {
-                        deleteConversation(conv.id)
-                      }
-                    }}
-                    className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
-                    title="Hapus"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+      {/* ── Recent Chats (Independently Scrollable) ── */}
+      <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 max-h-0 overflow-hidden' : 'opacity-100 flex-1 min-h-0 px-3 pb-3 mt-2'}`}>
+        <div className="flex items-center justify-between px-3 mb-2 shrink-0">
+          <span className="text-xs font-bold text-foreground">Recent Chats</span>
+          <Link
+            href="/dashboard/chat"
+            onClick={() => setSidebarOpen?.(false)}
+            className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
+            title="New Chat"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Link>
         </div>
-      </nav>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1">
+          {conversations.slice(0, 15).map(conv => {
+            const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
+            return (
+              <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover shrink-0">
+                <Link
+                  href={`/dashboard/chat?id=${conv.id}`}
+                  onClick={() => setSidebarOpen?.(false)}
+                  className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate text-xs">{conv.title}</div>
+                    <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
+                  </div>
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (confirm('Hapus percakapan ini?')) {
+                      deleteConversation(conv.id)
+                    }
+                  }}
+                  className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                  title="Hapus"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* ── Bottom nav ── */}
       <div ref={userMenuRef} className="p-3 border-t border-border-subtle flex flex-col relative">
