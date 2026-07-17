@@ -84,11 +84,8 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
   const displayAvatar = displayName.slice(0, 2).toUpperCase()
 
   return (
-    <motion.aside
-      initial={false}
-      animate={{ width: isCollapsed ? 72 : 240 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 32 }}
-      className="group relative flex flex-col h-full bg-bg-sidebar border-r border-border-subtle overflow-visible z-30 shrink-0 select-none"
+    <aside
+      className={`group relative flex flex-col h-full bg-bg-sidebar border-r border-border-subtle overflow-visible z-30 shrink-0 select-none transition-all duration-200 ${isCollapsed ? 'w-[72px]' : 'w-60'}`}
     >
       {/* ── Floating collapse toggle ── */}
       <button
@@ -113,19 +110,11 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           <div className="w-7 h-7 relative shrink-0">
             {mounted && resolvedTheme === 'dark' ? <Image src="/logo_dark.svg" alt="DocuMind AI" fill className="object-contain" /> : <Image src="/logo_light.svg" alt="DocuMind AI" fill className="object-contain" />}
           </div>
-          <AnimatePresence mode="popLayout">
-            {!isCollapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0, x: -8 }}
-                animate={{ opacity: 1, width: 'auto', x: 0 }}
-                exit={{ opacity: 0, width: 0, x: -8 }}
-                transition={{ duration: 0.18 }}
-                className="text-foreground font-semibold tracking-wide text-lg hidden sm:block overflow-hidden whitespace-nowrap"
-              >
-                ORLITH
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {!isCollapsed && (
+            <span className="text-foreground font-semibold tracking-wide text-lg hidden sm:block overflow-hidden whitespace-nowrap">
+              ORLITH
+            </span>
+          )}
         </Link>
         {setSidebarOpen && !isCollapsed && (
           <button
@@ -154,20 +143,12 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
                   <div className="w-2 h-2 rounded-full" style={{ background: activeWorkspace.color }} />
                 </div>
               </div>
-              <AnimatePresence mode="popLayout">
-                {!isCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.18 }}
-                    className="flex-1 text-left min-w-0 overflow-hidden"
-                  >
-                    <div className="text-xs font-semibold text-foreground truncate">{activeWorkspace.name}</div>
-                    <div className="text-[10px] text-text-muted">{activeWorkspace.docCount} docs</div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {!isCollapsed && (
+                <div className="flex-1 text-left min-w-0 overflow-hidden">
+                  <div className="text-xs font-semibold text-foreground truncate">{activeWorkspace.name}</div>
+                  <div className="text-[10px] text-text-muted">{activeWorkspace.docCount} docs</div>
+                </div>
+              )}
             </>
           ) : (
             isCollapsed ? null : (
@@ -176,36 +157,22 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               </div>
             )
           )}
-          <AnimatePresence mode="popLayout">
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0 }}
-              >
-                <ChevronsUpDown className="w-3.5 h-3.5 text-text-muted shrink-0 transition-all duration-300" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {!isCollapsed && (
+            <ChevronsUpDown className="w-3.5 h-3.5 text-text-muted shrink-0 transition-all duration-300" />
+          )}
         </button>
 
-        <AnimatePresence mode="popLayout">
-          {!isCollapsed && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8, width: 0 }}
-              animate={{ opacity: 1, scale: 1, width: 'auto' }}
-              exit={{ opacity: 0, scale: 0.8, width: 0 }}
-              transition={{ duration: 0.18 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onOpenCommandPalette}
-              className="rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-colors flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs p-2 overflow-hidden"
-              title="Search (⌘K)"
-            >
-              <Search className="w-4 h-4 shrink-0" />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        {!isCollapsed && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onOpenCommandPalette}
+            className="rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-colors flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs p-2 overflow-hidden"
+            title="Search (⌘K)"
+          >
+            <Search className="w-4 h-4 shrink-0" />
+          </motion.button>
+        )}
 
         <AnimatePresence>
           {workspaceMenuOpen && (
@@ -275,82 +242,66 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
                 />
               )}
               <item.icon className="w-4 h-4 shrink-0 relative z-10" />
-              <AnimatePresence mode="popLayout">
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0, x: -6 }}
-                    animate={{ opacity: 1, width: 'auto', x: 0 }}
-                    exit={{ opacity: 0, width: 0, x: -6 }}
-                    transition={{ duration: 0.18 }}
-                    className="overflow-hidden whitespace-nowrap relative z-10"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              {!isCollapsed && (
+                <span className="overflow-hidden whitespace-nowrap relative z-10">
+                  {item.label}
+                </span>
+              )}
             </Link>
           )
         })}
       </div>
 
       {/* ── Recent Chats (Scrollable when expanded, flexible spacer when collapsed to keep User Profile at bottom) ── */}
-      <div className={`flex flex-col flex-1 min-h-0 ${isCollapsed ? 'pointer-events-none' : 'px-3 pb-3 mt-2'}`}>
-        <AnimatePresence>
-          {!isCollapsed && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="flex flex-col flex-1 min-h-0 overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-3 mb-2 shrink-0">
-                <span className="text-xs font-bold text-foreground">Recent Chats</span>
-                <Link
-                  href="/dashboard/chat"
-                  onClick={() => setSidebarOpen?.(false)}
-                  className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
-                  title="New Chat"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1">
-                {conversations.slice(0, 15).map(conv => {
-                  const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
-                  return (
-                    <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover shrink-0">
-                      <Link
-                        href={`/dashboard/chat?id=${conv.id}`}
-                        onClick={() => setSidebarOpen?.(false)}
-                        className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate text-xs">{conv.title}</div>
-                          <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
-                        </div>
-                      </Link>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (confirm('Hapus percakapan ini?')) {
-                            deleteConversation(conv.id)
-                          }
-                        }}
-                        className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
-                        title="Hapus"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className={`flex flex-col flex-1 min-h-0 ${isCollapsed ? 'pointer-events-none hidden' : 'px-3 pb-3 mt-2'}`}>
+        {!isCollapsed && (
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between px-3 mb-2 shrink-0">
+              <span className="text-xs font-bold text-foreground">Recent Chats</span>
+              <Link
+                href="/dashboard/chat"
+                onClick={() => setSidebarOpen?.(false)}
+                className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
+                title="New Chat"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1">
+              {conversations.slice(0, 15).map(conv => {
+                const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
+                return (
+                  <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover shrink-0">
+                    <Link
+                      href={`/dashboard/chat?id=${conv.id}`}
+                      onClick={() => setSidebarOpen?.(false)}
+                      className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-xs">{conv.title}</div>
+                        <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (confirm('Hapus percakapan ini?')) {
+                          deleteConversation(conv.id)
+                        }
+                      }}
+                      className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                      title="Hapus"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Bottom nav ── */}
@@ -370,19 +321,11 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 border border-bg-sidebar animate-pulse" />
             )}
           </div>
-          <AnimatePresence mode="popLayout">
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.18 }}
-                className="flex-1 min-w-0 overflow-hidden"
-              >
-                <div className="text-xs font-semibold text-foreground truncate">{displayName}</div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="text-xs font-semibold text-foreground truncate">{displayName}</div>
+            </div>
+          )}
         </button>
 
         {/* User Menu Dropdown */}
@@ -521,6 +464,6 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
           )}
         </AnimatePresence>
       </div>
-    </motion.aside>
+    </aside>
   )
 }
