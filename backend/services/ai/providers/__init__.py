@@ -22,13 +22,9 @@ def get_provider_adapter(
         if not api_key:
             raise ValueError("Anthropic requires an API key")
         return AnthropicProvider(api_key)
-    elif provider_name == "gemini":
+    elif provider_name in ("gemini", "gemini_interactions", "gemini-interactions"):
         if not api_key:
             raise ValueError("Gemini requires an API key")
-        return GeminiProvider(api_key)
-    elif provider_name in ("gemini_interactions", "gemini-interactions"):
-        if not api_key:
-            raise ValueError("Gemini Interactions requires an API key")
         return InteractionsGeminiProvider(api_key)
     elif provider_name == "ollama":
         # Ollama base URL can be passed as api_key, or an actual API key for Ollama Cloud

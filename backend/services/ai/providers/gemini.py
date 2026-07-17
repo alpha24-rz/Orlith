@@ -20,8 +20,8 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
             self.headers["Authorization"] = f"Bearer {self.api_key}"
 
     def _clean_model_name(self, model: str) -> str:
-        if not model or model == "default" or model == "gemini":
-            return "gemini-2.5-flash"
+        if not model or model in ("default", "gemini", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "models/gemini-1.5-flash", "models/gemini-2.5-flash"):
+            return "gemini-3.5-flash"
         return model.replace("models/", "")
 
     def _format_messages_for_native(self, messages: list[dict]) -> list[dict]:
@@ -314,8 +314,8 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         return formatted_input
 
     def _clean_model_name(self, model: str) -> str:
-        if not model or model == "default" or model == "gemini":
-            return "gemini-2.5-flash"
+        if not model or model in ("default", "gemini", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "models/gemini-1.5-flash", "models/gemini-2.5-flash"):
+            return "gemini-3.5-flash"
         return model.replace("models/", "")
 
     async def generate_response(
@@ -333,44 +333,61 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         background = kwargs.get("background", False)
 
         clean_model = self._clean_model_name(model)
-        input_data = self._prepare_input(messages, previous_interaction_id, store)
-        payload = {
-            "model": clean_model,
-            "input": input_data,
-        }
-        if previous_interaction_id:
-            payload["previous_interaction_id"] = previous_interaction_id
-        if not previous_interaction_id and not store:
-            payload["store"] = False
-        if tools:
-            payload["tools"] = tools
-        if response_format:
-            payload["response_format"] = response_format
-        if background:
-            payload["background"] = True
+        models_to_try = []
+        for m in [clean_model, "gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash"]:
+            if m not in models_to_try:
+                models_to_try.append(m)
 
+        input_data = self._prepare_input(messages, previous_interaction_id, store)
+        
         async with httpx.AsyncClient(timeout=90) as client:
-            resp = await client.post(
-                f"{self.base_url}?key={self.api_key}",
-                json=payload,
-                headers=self.headers,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            
-            # If output_text exists directly, return it
-            if "output_text" in data and data["output_text"]:
-                return data["output_text"]
-                
-            # Otherwise extract text from steps
-            steps = data.get("steps", [])
-            output_texts = []
-            for step in steps:
-                if step.get("type") == "model_output":
-                    for c in step.get("content", []):
-                        if c.get("type") == "text" and c.get("text"):
-                            output_texts.append(c["text"])
-            return "\n".join(output_texts) if output_texts else ""
+            last_err = None
+            for m in models_to_try:
+                payload = {
+                    "model": m,
+                    "input": input_data,
+                }
+                if previous_interaction_id:
+                    payload["previous_interaction_id"] = previous_interaction_id
+                if not previous_interaction_id and not store:
+                    payload["store"] = False
+                if tools:
+                    payload["tools"] = tools
+                if response_format:
+                    payload["response_format"] = response_format
+                if background:
+                    payload["background"] = True
+
+                try:
+                    resp = await client.post(
+                        f"{self.base_url}?key={self.api_key}",
+                        json=payload,
+                        headers=self.headers,
+                    )
+                    if resp.status_code in (404, 401, 400, 429) and m != models_to_try[-1]:
+                        logger.warning(f"Model {m} returned {resp.status_code} on Interactions API, trying alternative model...")
+                        continue
+                    resp.raise_for_status()
+                    data = resp.json()
+                    
+                    if "output_text" in data and data["output_text"]:
+                        return data["output_text"]
+                        
+                    steps = data.get("steps", [])
+                    output_texts = []
+                    for step in steps:
+                        if step.get("type") == "model_output":
+                            for c in step.get("content", []):
+                                if c.get("type") == "text" and c.get("text"):
+                                    output_texts.append(c["text"])
+                    return "\n".join(output_texts) if output_texts else ""
+                except Exception as e:
+                    last_err = e
+                    continue
+
+            if last_err:
+                raise last_err
+            return ""
 
     async def stream_response(
         self,
@@ -386,43 +403,65 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         response_format = kwargs.get("response_format")
 
         clean_model = self._clean_model_name(model)
+        models_to_try = []
+        for m in [clean_model, "gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash"]:
+            if m not in models_to_try:
+                models_to_try.append(m)
+
         input_data = self._prepare_input(messages, previous_interaction_id, store)
-        payload = {
-            "model": clean_model,
-            "input": input_data,
-            "stream": True,
-        }
-        if previous_interaction_id:
-            payload["previous_interaction_id"] = previous_interaction_id
-        if not previous_interaction_id and not store:
-            payload["store"] = False
-        if tools:
-            payload["tools"] = tools
-        if response_format:
-            payload["response_format"] = response_format
 
         async with httpx.AsyncClient(timeout=90) as client:
-            async with client.stream(
-                "POST",
-                f"{self.base_url}?key={self.api_key}&alt=sse",
-                json=payload,
-                headers=self.headers,
-            ) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if line.startswith("data: ") and line != "data: [DONE]":
-                        try:
-                            data = json.loads(line[6:])
-                            event_type = data.get("event_type")
-                            if event_type == "step.delta":
-                                delta = data.get("delta", {})
-                                if delta.get("type") == "text" and delta.get("text"):
-                                    yield delta["text"]
-                        except Exception:
-                            pass
+            last_err = None
+            for m in models_to_try:
+                payload = {
+                    "model": m,
+                    "input": input_data,
+                    "stream": True,
+                }
+                if previous_interaction_id:
+                    payload["previous_interaction_id"] = previous_interaction_id
+                if not previous_interaction_id and not store:
+                    payload["store"] = False
+                if tools:
+                    payload["tools"] = tools
+                if response_format:
+                    payload["response_format"] = response_format
+
+                try:
+                    req = client.build_request(
+                        "POST",
+                        f"{self.base_url}?key={self.api_key}&alt=sse",
+                        json=payload,
+                        headers=self.headers,
+                    )
+                    resp = await client.send(req, stream=True)
+                    if resp.status_code in (404, 401, 400, 429) and m != models_to_try[-1]:
+                        await resp.aclose()
+                        logger.warning(f"Model {m} returned {resp.status_code} on Interactions stream API, trying alternative model...")
+                        continue
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            try:
+                                data = json.loads(line[6:])
+                                event_type = data.get("event_type")
+                                if event_type == "step.delta":
+                                    delta = data.get("delta", {})
+                                    if delta.get("type") == "text" and delta.get("text"):
+                                        yield delta["text"]
+                            except Exception:
+                                pass
+                    await resp.aclose()
+                    return
+                except Exception as e:
+                    last_err = e
+                    continue
+
+            if last_err:
+                raise last_err
 
     async def get_available_models(self) -> list[str]:
-        return ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        return ["gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
     async def validate_api_key(self) -> bool:
         return await self._embedding_delegate.validate_api_key()
