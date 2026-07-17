@@ -5,7 +5,7 @@ from core.database import get_db
 from models import UserAPIKey, User
 from schemas import APIKeyCreate, APIKeyResponse
 from core.security import encrypt_api_key, mask_api_key
-from providers import get_provider_adapter
+from services.ai.providers import get_provider_adapter
 from api.deps import get_current_user
 from typing import List
 from services.ai.registry import ModelInfo

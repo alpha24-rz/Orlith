@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     # AI Settings
     OPENROUTER_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    HF_TOKEN: str = ""
+    HUGGINGFACE_API_KEY: str = ""
     LLM_MODEL: str = "deepseek/deepseek-v3.2-exp"
     EMBEDDING_PROVIDER: str = "huggingface"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
@@ -103,4 +105,11 @@ if settings.DATABASE_URL.startswith("sqlite"):
     db_dir = os.path.dirname(settings.DATABASE_URL.replace("sqlite+aiosqlite:///", ""))
     if db_dir and db_dir != ".":
         os.makedirs(db_dir, exist_ok=True)
+
+# Propagate Hugging Face token to environment variables if set
+_hf_token = settings.HF_TOKEN or settings.HUGGINGFACE_API_KEY or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+if _hf_token:
+    os.environ["HF_TOKEN"] = _hf_token
+    os.environ["HUGGINGFACE_HUB_TOKEN"] = _hf_token
+
 

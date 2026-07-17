@@ -6,7 +6,7 @@ from models.user import User
 from models.workspace import Workspace
 from models.credential import WorkspaceCredential
 from api.deps import get_current_user
-from providers.manager import SUPPORTED_PROVIDERS, ProviderManager
+from services.ai.providers.manager import SUPPORTED_PROVIDERS, ProviderManager
 from services.validation import WorkspaceValidator
 from core.security import encrypt_api_key, decrypt_api_key
 import json

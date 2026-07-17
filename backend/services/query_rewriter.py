@@ -21,7 +21,7 @@ import logging
 import json
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
-from providers.base import ILLMProvider
+from services.ai.providers.base import ILLMProvider
 
 logger = logging.getLogger(__name__)
 

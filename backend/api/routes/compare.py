@@ -13,6 +13,10 @@ import asyncio
 import json
 import logging
 from typing import List
+from services.ai.registry import ModelRegistry
+from models import UserAPIKey
+from core.security import decrypt_api_key
+from services.ai.providers import get_provider_adapter
 
 from core.database import get_db
 from models import Workspace, ModelCompareVote
@@ -40,11 +44,6 @@ class VoteRequest(BaseModel):
 
 async def get_model_adapter(db: AsyncSession, owner_id: str, model_name: str):
     """Mencari API key yang sesuai dan membuat adapter provider LLM."""
-    from services.ai.registry import ModelRegistry
-    from models import UserAPIKey
-    from core.security import decrypt_api_key
-    from services.ai.providers import get_provider_adapter
-    
     models = await ModelRegistry.get_models(owner_id, db)
     provider = None
     for m in models:

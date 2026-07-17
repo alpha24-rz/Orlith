@@ -16,7 +16,7 @@ Strategi:
 import logging
 from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from providers.base import ILLMProvider
+from services.ai.providers.base import ILLMProvider
 
 logger = logging.getLogger(__name__)
 

@@ -73,10 +73,10 @@ async def test_tool_registry():
 @pytest.mark.anyio
 async def test_provider_stream_generator_type():
     import inspect
-    from providers.gemini import GeminiProvider
-    from providers.openai import OpenAIProvider
-    from providers.anthropic import AnthropicProvider
-    from providers.ollama import OllamaProvider
+    from services.ai.providers.gemini import GeminiProvider
+    from services.ai.providers.openai import OpenAIProvider
+    from services.ai.providers.anthropic import AnthropicProvider
+    from services.ai.providers.ollama import OllamaProvider
 
     providers_list = [
         GeminiProvider("dummy_key"),

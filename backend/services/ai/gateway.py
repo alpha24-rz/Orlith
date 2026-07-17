@@ -6,7 +6,11 @@ import logging
 from sqlalchemy import select
 from models.workspace import Workspace
 from models.credential import WorkspaceCredential
-from providers.manager import ProviderManager
+from models.api_key import UserAPIKey
+from services.ai.providers.manager import ProviderManager
+from services.ai.providers import get_provider_adapter
+from services.ai.providers.gemini import GeminiProvider
+from services.ai.providers.local_embedding import LocalEmbeddingProvider
 from core.security import decrypt_api_key
 import json
 from services.ai.health_monitor import openai_health, gemini_health, huggingface_health
@@ -114,7 +118,6 @@ class LLMGateway:
 
                 # 2. Check user-level API key
                 if workspace:
-                    from models.api_key import UserAPIKey
                     result = await self.db.execute(
                         select(UserAPIKey).where(
                             UserAPIKey.user_id == workspace.owner_id,
@@ -125,7 +128,6 @@ class LLMGateway:
                     if user_key:
                         try:
                             raw_key = decrypt_api_key(user_key.encrypted_key)
-                            from providers import get_provider_adapter
                             adapter = get_provider_adapter(provider_name, raw_key)
                             return adapter, model_name
                         except Exception as e:
@@ -133,7 +135,6 @@ class LLMGateway:
 
             # 3. Fallback to system settings for Gemini
             if provider_name == "gemini" and settings.GEMINI_API_KEY:
-                from providers.gemini import GeminiProvider
                 return GeminiProvider(settings.GEMINI_API_KEY), model_name
  
 
@@ -146,7 +147,6 @@ class LLMGateway:
 
         # Fallback to Gemini if configured and not offline
         if settings.GEMINI_API_KEY and gemini_health.state != "Offline":
-            from providers.gemini import GeminiProvider
             return GeminiProvider(settings.GEMINI_API_KEY), "gemini-1.5-flash"
 
         # Fallback to OpenRouter (OpenAI fallback)
@@ -161,7 +161,6 @@ class LLMGateway:
     ) -> tuple[IEmbeddingProvider, str]:
         # 1. Priority override: system-level local huggingface embeddings
         if settings.EMBEDDING_PROVIDER == "huggingface":
-            from services.ai.providers.local_embedding import LocalEmbeddingProvider
             model_name = settings.EMBEDDING_MODEL
             return LocalEmbeddingProvider(), model_name
 
@@ -171,13 +170,11 @@ class LLMGateway:
             model_name = workspace.active_embedding_model or "default"
             
             if provider_name in ("huggingface", "local"):
-                from services.ai.providers.local_embedding import LocalEmbeddingProvider
                 actual_model = model_name if model_name != "default" else settings.EMBEDDING_MODEL
                 return LocalEmbeddingProvider(), actual_model
             
             # Fallback to system-level Gemini API key if provider is Gemini
             if provider_name == "gemini" and settings.GEMINI_API_KEY:
-                from providers.gemini import GeminiProvider
                 return GeminiProvider(settings.GEMINI_API_KEY), model_name or "models/gemini-embedding-001"
 
             if self.db:
@@ -198,7 +195,6 @@ class LLMGateway:
                         logger.error(f"Failed to load embedding provider {provider_name} for workspace {workspace.id}: {e}")
 
                 # Check UserAPIKey fallback
-                from models.api_key import UserAPIKey
                 result = await self.db.execute(
                     select(UserAPIKey).where(
                         UserAPIKey.user_id == workspace.owner_id,
@@ -209,7 +205,6 @@ class LLMGateway:
                 if user_key:
                     try:
                         raw_key = decrypt_api_key(user_key.encrypted_key)
-                        from providers import get_provider_adapter
                         adapter = get_provider_adapter(provider_name, raw_key)
                         if isinstance(adapter, IEmbeddingProvider):
                             return adapter, model_name
@@ -218,7 +213,6 @@ class LLMGateway:
 
         # 3. Fallback to Gemini if configured
         if settings.GEMINI_API_KEY:
-            from providers.gemini import GeminiProvider
             return GeminiProvider(settings.GEMINI_API_KEY), "models/gemini-embedding-001"
 
         # 4. Fallback to OpenRouter
