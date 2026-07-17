@@ -109,20 +109,20 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </button>
 
       {/* ── Logo ── */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-border-subtle min-w-0">
+      <div className={`flex items-center ${isCollapsed ? 'justify-center px-2 py-4' : 'justify-between px-4 py-4'} border-b border-border-subtle min-w-0 shrink-0`}>
         <Link href="/" className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 relative shrink-0">
             {mounted && resolvedTheme === 'dark' ? <Image src="/logo_dark.svg" alt="DocuMind AI" fill className="object-contain" /> : <Image src="/logo_light.svg" alt="DocuMind AI" fill className="object-contain" />}
-
           </div>
-          <span className={`text-foreground font-semibold tracking-wide text-lg hidden sm:block ${labelClass}`}>
-            ORLITH
-          </span>
+          {!isCollapsed && (
+            <span className="text-foreground font-semibold tracking-wide text-lg hidden sm:block overflow-hidden whitespace-nowrap">
+              ORLITH
+            </span>
+          )}
         </Link>
-        {setSidebarOpen && (
+        {setSidebarOpen && !isCollapsed && (
           <button
-            className={`md:hidden p-1 text-text-muted hover:text-foreground transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
-              }`}
+            className="md:hidden p-1 text-text-muted hover:text-foreground transition-all duration-300"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -131,10 +131,10 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </div>
 
       {/* ── Workspace switcher & Global Search Icon ── */}
-      <div ref={workspaceRef} className={`p-3 border-b border-border-subtle relative z-20 flex ${isCollapsed ? 'flex-col items-center gap-2.5' : 'items-center justify-between gap-1.5'}`}>
+      <div ref={workspaceRef} className={`border-b border-border-subtle relative z-20 flex shrink-0 ${isCollapsed ? 'flex-col items-center gap-2 p-2.5' : 'items-center justify-between gap-1.5 p-3'}`}>
         <button
           onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
-          className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-bg-hover transition-colors min-w-0"
+          className={`flex items-center gap-2 rounded-lg hover:bg-bg-hover transition-colors min-w-0 ${isCollapsed ? 'justify-center p-1.5 w-full' : 'flex-1 px-2.5 py-1.5'}`}
           title={isCollapsed && activeWorkspace ? activeWorkspace.name : undefined}
         >
           {activeWorkspace ? (
@@ -147,25 +147,26 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
                   <div className="w-2 h-2 rounded-full" style={{ background: activeWorkspace.color }} />
                 </div>
               </div>
-              <div className={`flex-1 text-left min-w-0 ${labelClass}`}>
-                <div className="text-xs font-semibold text-foreground truncate">{activeWorkspace.name}</div>
-                <div className="text-[10px] text-text-muted">{activeWorkspace.docCount} docs · {activeWorkspace.memberCount} members</div>
-              </div>
+              {!isCollapsed && (
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-xs font-semibold text-foreground truncate">{activeWorkspace.name}</div>
+                  <div className="text-[10px] text-text-muted">{activeWorkspace.docCount} docs</div>
+                </div>
+              )}
             </>
           ) : (
-            <div className={`flex-1 text-left min-w-0 ${labelClass}`}>
-              <div className="text-xs font-semibold text-text-subtle truncate">No workspaces</div>
-            </div>
+            isCollapsed ? null : (
+              <div className="flex-1 text-left min-w-0">
+                <div className="text-xs font-semibold text-text-subtle truncate">No workspaces</div>
+              </div>
+            )
           )}
-          <ChevronsUpDown
-            className={`w-3.5 h-3.5 text-text-muted shrink-0 transition-all duration-300 ${isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
-              }`}
-          />
+          {!isCollapsed && <ChevronsUpDown className="w-3.5 h-3.5 text-text-muted shrink-0 transition-all duration-300" />}
         </button>
 
         <button
           onClick={onOpenCommandPalette}
-          className="p-2 rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-all flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs"
+          className={`rounded-lg bg-bg-input/80 hover:bg-bg-input text-text-muted hover:text-indigo-400 transition-all flex items-center justify-center shrink-0 border border-border-subtle hover:border-border-strong shadow-2xs ${isCollapsed ? 'p-2 w-full' : 'p-2'}`}
           title="Search (⌘K)"
         >
           <Search className="w-4 h-4 shrink-0" />
@@ -208,7 +209,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </div>
 
       {/* ── Main nav (Fixed & Non-scrolling) ── */}
-      <div className="p-3 pb-2 flex flex-col gap-0.5 shrink-0">
+      <div className={`flex flex-col gap-0.5 shrink-0 ${isCollapsed ? 'p-2 items-center' : 'p-3 pb-2'}`}>
         {NAV.map(item => {
           const active = pathname === item.href
           return (
@@ -218,73 +219,81 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               id={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
               onClick={() => setSidebarOpen?.(false)}
               title={isCollapsed ? item.label : undefined}
-              className={`flex items-center gap-3 rounded-lg text-sm transition-colors duration-150 px-3 py-2 min-w-0 ${active
+              className={`flex items-center rounded-lg text-sm transition-colors duration-150 min-w-0 ${
+                isCollapsed ? 'justify-center w-10 h-10 p-0 mx-auto' : 'gap-3 px-3 py-2'
+              } ${active
                 ? 'bg-white/5 text-foreground font-semibold'
                 : 'text-text-subtle hover:text-foreground hover:bg-bg-hover'
                 }`}
             >
               <item.icon className={`w-4 h-4 shrink-0`} />
-              <span className={labelClass}>{item.label}</span>
+              {!isCollapsed && <span className="overflow-hidden whitespace-nowrap">{item.label}</span>}
             </Link>
           )
         })}
       </div>
 
-      {/* ── Recent Chats (Independently Scrollable) ── */}
-      <div className={`flex flex-col transition-all duration-300 ${isCollapsed ? 'opacity-0 max-h-0 overflow-hidden' : 'opacity-100 flex-1 min-h-0 px-3 pb-3 mt-2'}`}>
-        <div className="flex items-center justify-between px-3 mb-2 shrink-0">
-          <span className="text-xs font-bold text-foreground">Recent Chats</span>
-          <Link
-            href="/dashboard/chat"
-            onClick={() => setSidebarOpen?.(false)}
-            className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
-            title="New Chat"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1">
-          {conversations.slice(0, 15).map(conv => {
-            const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
-            return (
-              <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover shrink-0">
-                <Link
-                  href={`/dashboard/chat?id=${conv.id}`}
-                  onClick={() => setSidebarOpen?.(false)}
-                  className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
-                >
-                  <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate text-xs">{conv.title}</div>
-                    <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
+      {/* ── Recent Chats (Scrollable when expanded, flexible spacer when collapsed to keep User Profile at bottom) ── */}
+      <div className={`flex flex-col transition-all duration-300 flex-1 min-h-0 ${isCollapsed ? 'opacity-0 pointer-events-none overflow-hidden' : 'opacity-100 px-3 pb-3 mt-2'}`}>
+        {!isCollapsed && (
+          <>
+            <div className="flex items-center justify-between px-3 mb-2 shrink-0">
+              <span className="text-xs font-bold text-foreground">Recent Chats</span>
+              <Link
+                href="/dashboard/chat"
+                onClick={() => setSidebarOpen?.(false)}
+                className="p-1 rounded-md text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors"
+                title="New Chat"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1">
+              {conversations.slice(0, 15).map(conv => {
+                const active = pathname === '/dashboard/chat' && (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('id') === conv.id)
+                return (
+                  <div key={conv.id} className="group/chat flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors duration-150 min-w-0 hover:bg-bg-hover shrink-0">
+                    <Link
+                      href={`/dashboard/chat?id=${conv.id}`}
+                      onClick={() => setSidebarOpen?.(false)}
+                      className={`flex-1 min-w-0 flex items-center gap-2 ${active ? 'text-foreground font-medium' : 'text-text-subtle'}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-xs">{conv.title}</div>
+                        <div className="text-[9px] text-text-muted">{formatRelativeTime(conv.updated_at)}</div>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (confirm('Hapus percakapan ini?')) {
+                          deleteConversation(conv.id)
+                        }
+                      }}
+                      className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
+                      title="Hapus"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                </Link>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (confirm('Hapus percakapan ini?')) {
-                      deleteConversation(conv.id)
-                    }
-                  }}
-                  className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
-                  title="Hapus"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Bottom nav ── */}
-      <div ref={userMenuRef} className="p-3 border-t border-border-subtle flex flex-col relative">
+      <div ref={userMenuRef} className={`border-t border-border-subtle flex flex-col relative shrink-0 mt-auto ${isCollapsed ? 'p-2 items-center' : 'p-3'}`}>
 
         {/* User Profile */}
         <button
           onClick={() => { setUserMenuOpen(!userMenuOpen); setNotificationsOpen(false) }}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-hover transition-colors text-left min-w-0"
+          className={`flex items-center rounded-lg hover:bg-bg-hover transition-colors text-left min-w-0 ${
+            isCollapsed ? 'justify-center w-10 h-10 mx-auto p-0' : 'gap-2.5 px-3 py-2 w-full'
+          }`}
           title={isCollapsed ? displayEmail : undefined}
         >
           <div className="relative w-7 h-7 rounded-full shrink-0 bg-indigo-100 dark:bg-indigo-600/30 border border-indigo-300 dark:border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-700 dark:text-indigo-300">
@@ -293,9 +302,11 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 border border-bg-sidebar animate-pulse" />
             )}
           </div>
-          <div className={`flex-1 min-w-0 ${labelClass}`}>
-            <div className="text-xs font-semibold text-foreground truncate">{displayName}</div>
-          </div>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="text-xs font-semibold text-foreground truncate">{displayName}</div>
+            </div>
+          )}
         </button>
 
         {/* User Menu Dropdown */}
