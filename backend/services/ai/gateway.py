@@ -137,9 +137,7 @@ class LLMGateway:
             if provider_name in ("gemini_interactions", "gemini-interactions") and settings.GEMINI_API_KEY:
                 return InteractionsGeminiProvider(settings.GEMINI_API_KEY), model_name
             if provider_name == "gemini" and settings.GEMINI_API_KEY:
-                if getattr(settings, "GEMINI_USE_INTERACTIONS_API", False):
-                    return InteractionsGeminiProvider(settings.GEMINI_API_KEY), model_name
-                return GeminiProvider(settings.GEMINI_API_KEY), model_name
+                return InteractionsGeminiProvider(settings.GEMINI_API_KEY), model_name
  
 
             # 4. Fallback to system settings for OpenRouter
@@ -151,9 +149,7 @@ class LLMGateway:
 
         # Fallback to Gemini if configured and not offline
         if settings.GEMINI_API_KEY and gemini_health.state != "Offline":
-            if getattr(settings, "GEMINI_USE_INTERACTIONS_API", False):
-                return InteractionsGeminiProvider(settings.GEMINI_API_KEY), "gemini-3.5-flash"
-            return GeminiProvider(settings.GEMINI_API_KEY), "gemini-1.5-flash"
+            return InteractionsGeminiProvider(settings.GEMINI_API_KEY), "gemini-3.5-flash"
 
         # Fallback to OpenRouter (OpenAI fallback)
         model = settings.LLM_MODEL
