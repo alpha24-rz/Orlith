@@ -227,11 +227,19 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
     async def validate_api_key(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
+                # Periksa endpoint native models (v1beta/models) yang selalu mengembalikan 200 untuk API Key valid
                 resp = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}",
+                    headers=self.headers,
+                )
+                if resp.status_code == 200:
+                    return True
+                # Fallback periksa base_url models
+                resp2 = await client.get(
                     f"{self.base_url}/models?key={self.api_key}",
                     headers=self.headers,
                 )
-                return resp.status_code == 200
+                return resp2.status_code == 200
         except Exception:
             return False
 
@@ -464,7 +472,15 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
         return ["gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
 
     async def validate_api_key(self) -> bool:
-        return await self._embedding_delegate.validate_api_key()
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}",
+                    headers=self.headers,
+                )
+                return resp.status_code == 200
+        except Exception:
+            return False
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         return await self._embedding_delegate.embed(texts, model)
