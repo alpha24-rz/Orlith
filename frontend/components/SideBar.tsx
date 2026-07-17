@@ -236,7 +236,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
               {active && (
                 <motion.div
                   layoutId="activeNavIndicator"
-                  className="absolute inset-y-0 left-2 right-2 rounded-lg bg-white/5 border border-white/10"
+                  className="absolute inset-y-0 left-2 right-2 rounded-lg bg-foreground/[0.06] dark:bg-white/5 border border-foreground/[0.08] dark:border-white/10 shadow-2xs"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
