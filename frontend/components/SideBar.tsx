@@ -129,7 +129,7 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
       </div>
 
       {/* ── Workspace switcher & Global Search Icon ── */}
-      <div ref={workspaceRef} className="border-b border-border-subtle relative z-20 flex items-center h-[52px] shrink-0 overflow-hidden">
+      <div ref={workspaceRef} className="border-b border-border-subtle relative z-20 flex items-center h-[52px] shrink-0">
         <button
           onClick={() => setWorkspaceMenuOpen(!workspaceMenuOpen)}
           className="flex items-center justify-start h-full hover:bg-bg-hover transition-colors min-w-0 w-full overflow-hidden"
