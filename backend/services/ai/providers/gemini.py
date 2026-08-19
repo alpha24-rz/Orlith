@@ -103,7 +103,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                         json=native_payload,
                         headers=self.headers,
                     )
-                    if resp_native.status_code in (404, 401, 400) and m != models_to_try[-1]:
+                    if resp_native.status_code >= 400 and m != models_to_try[-1]:
                         logger.warning(f"Model {m} returned {resp_native.status_code} on generateContent, trying alternative model...")
                         continue
                     resp_native.raise_for_status()
@@ -198,7 +198,7 @@ class GeminiProvider(ILLMProvider, IEmbeddingProvider):
                             headers=self.headers,
                         )
                         native_resp = await client.send(req_native, stream=True)
-                        if native_resp.status_code in (404, 401, 400) and m != models_to_try[-1]:
+                        if native_resp.status_code >= 400 and m != models_to_try[-1]:
                             await native_resp.aclose()
                             logger.warning(f"Model {m} returned {native_resp.status_code} on streamGenerateContent, trying alternative model...")
                             continue
@@ -372,9 +372,12 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                         json=payload,
                         headers=self.headers,
                     )
-                    if resp.status_code in (404, 401, 400, 429) and m != models_to_try[-1]:
+                    if resp.status_code >= 400 and m != models_to_try[-1]:
                         logger.warning(f"Model {m} returned {resp.status_code} on Interactions API, trying alternative model...")
                         continue
+                    if resp.status_code >= 400:
+                        last_err = Exception(f"Interactions API returned {resp.status_code}: {resp.text[:200]}")
+                        break
                     resp.raise_for_status()
                     data = resp.json()
                     
@@ -388,14 +391,21 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                             for c in step.get("content", []):
                                 if c.get("type") == "text" and c.get("text"):
                                     output_texts.append(c["text"])
-                    return "\n".join(output_texts) if output_texts else ""
+                    if output_texts:
+                        return "\n".join(output_texts)
+                    logger.warning(f"Model {m} produced no output text on Interactions API, trying alternative model...")
                 except Exception as e:
                     last_err = e
                     continue
 
-            if last_err:
-                raise last_err
-            return ""
+            logger.warning(f"Interactions API failed across all models ({last_err}), falling back to delegate GeminiProvider (generateContent/OpenAI endpoint)")
+            return await self._embedding_delegate.generate_response(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
+            )
 
     async def stream_response(
         self,
@@ -443,10 +453,15 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                         headers=self.headers,
                     )
                     resp = await client.send(req, stream=True)
-                    if resp.status_code in (404, 401, 400, 429) and m != models_to_try[-1]:
+                    if resp.status_code >= 400 and m != models_to_try[-1]:
                         await resp.aclose()
                         logger.warning(f"Model {m} returned {resp.status_code} on Interactions stream API, trying alternative model...")
                         continue
+                    if resp.status_code >= 400:
+                        err_text = await resp.aread()
+                        await resp.aclose()
+                        last_err = Exception(f"Interactions stream API returned {resp.status_code}: {err_text.decode('utf-8', errors='ignore')[:200]}")
+                        break
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if line.startswith("data: ") and line != "data: [DONE]":
@@ -465,8 +480,15 @@ class InteractionsGeminiProvider(ILLMProvider, IEmbeddingProvider):
                     last_err = e
                     continue
 
-            if last_err:
-                raise last_err
+            logger.warning(f"Interactions stream API failed across all models ({last_err}), falling back to delegate GeminiProvider stream_response")
+            async for chunk in self._embedding_delegate.stream_response(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
+            ):
+                yield chunk
 
     async def get_available_models(self) -> list[str]:
         return ["gemini-3.5-flash", "gemini-3.1-flash-image", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]

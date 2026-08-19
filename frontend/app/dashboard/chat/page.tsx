@@ -1152,6 +1152,12 @@ function ChatPageInner() {
       setLoadingThread(true)
     }
 
+    if (conversationId.startsWith('temp_')) {
+      setMessages([])
+      setLoadingThread(false)
+      return
+    }
+
     try {
       const headers: HeadersInit = {}
       const token = localStorage.getItem('auth_token')
@@ -1165,9 +1171,9 @@ function ChatPageInner() {
           role: m.role,
           content: m.content,
           timestamp: new Date(m.created_at),
-          citations: m.citations,
-          confidence: m.confidence,
-          model: m.model,
+          citations: m.citations || m.metadata_json?.citations,
+          confidence: m.confidence ?? m.metadata_json?.confidence,
+          model: m.model || m.metadata_json?.model,
           queriesUsed: m.metadata_json?.queriesUsed,
           source_mode: m.metadata_json?.source_mode,
           retrieval_score: m.metadata_json?.retrieval_score,
@@ -1351,9 +1357,9 @@ function ChatPageInner() {
               role: m.role,
               content: m.content,
               timestamp: new Date(m.created_at),
-              citations: m.citations,
-              confidence: m.confidence,
-              model: m.model,
+              citations: m.citations || m.metadata_json?.citations,
+              confidence: m.confidence ?? m.metadata_json?.confidence,
+              model: m.model || m.metadata_json?.model,
               queriesUsed: m.metadata_json?.queriesUsed,
               source_mode: m.metadata_json?.source_mode,
               retrieval_score: m.metadata_json?.retrieval_score,
@@ -1481,7 +1487,6 @@ function ChatPageInner() {
                     latency_ms: evt.latency_ms,
                   },
                 ])
-                setAgentSteps([])
                 if (evt.conversation_id) {
                   finalConvId = evt.conversation_id
                   if (!currentConvId) {
@@ -1546,9 +1551,9 @@ function ChatPageInner() {
               role: m.role,
               content: m.content,
               timestamp: new Date(m.created_at),
-              citations: m.citations,
-              confidence: m.confidence,
-              model: m.model,
+              citations: m.citations || m.metadata_json?.citations,
+              confidence: m.confidence ?? m.metadata_json?.confidence,
+              model: m.model || m.metadata_json?.model,
               queriesUsed: m.metadata_json?.queriesUsed,
               source_mode: m.metadata_json?.source_mode,
               retrieval_score: m.metadata_json?.retrieval_score,

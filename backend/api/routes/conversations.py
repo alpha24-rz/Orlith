@@ -8,6 +8,7 @@ from models.user import User
 from models.conversation import Conversation, Message
 from schemas.conversation import ConversationOut, ConversationWithMessagesOut
 from api.deps import get_current_user, get_workspace_member
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
@@ -31,6 +32,15 @@ async def get_conversation_messages(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if conversation_id.startswith("temp_"):
+        return {
+            "id": conversation_id,
+            "workspace_id": "",
+            "title": "New Chat",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+            "messages": [],
+        }
     result = await db.execute(
         select(Conversation)
         .options(selectinload(Conversation.messages))
@@ -49,6 +59,8 @@ async def delete_conversation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if conversation_id.startswith("temp_"):
+        return {"message": "Conversation deleted"}
     result = await db.execute(
         select(Conversation)
         .where(Conversation.id == conversation_id)
@@ -70,6 +82,8 @@ async def delete_messages_from(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if conversation_id.startswith("temp_"):
+        return {"message": "Messages deleted"}
     result = await db.execute(
         select(Conversation)
         .where(Conversation.id == conversation_id)
