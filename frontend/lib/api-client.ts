@@ -70,14 +70,14 @@ export const api = {
       memberCount: w.member_count || 1
     })) as Workspace[]
   },
-  createWorkspace: async (data: { name: string; description?: string }) => {
+  createWorkspace: async (data: { name: string; description?: string; color?: string }) => {
     const w = await fetchAPI<any>('/workspaces', {
       method: 'POST',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ name: data.name, description: data.description })
     })
     return {
       ...w,
-      color: '#6366F1',
+      color: data.color || '#6366F1',
       docCount: 0,
       memberCount: 1
     } as Workspace

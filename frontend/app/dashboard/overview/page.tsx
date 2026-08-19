@@ -71,7 +71,7 @@ export default function DashboardPage() {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Real data integration
-  const { activeWorkspace, workspaces } = useWorkspaceStore()
+  const { activeWorkspace, workspaces, setActiveWorkspace } = useWorkspaceStore()
   const activeWorkspaceId = activeWorkspace?.id
   const [documents, setDocuments] = useState<any[]>([])
   const [isUploaderOpen, setIsUploaderOpen] = useState(false)
@@ -329,8 +329,11 @@ export default function DashboardPage() {
                 workspaces.map(w => (
                   <div
                     key={w.id}
-                    onClick={() => addToast("Workspace Switched", `Active scope changed to ${w.name}`, "success")}
-                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-bg-hover cursor-pointer transition-colors border border-transparent hover:border-border-strong"
+                    onClick={() => {
+                      setActiveWorkspace(w)
+                      addToast("Workspace Switched", `Active scope changed to ${w.name}`, "success")
+                    }}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl hover:bg-bg-hover cursor-pointer transition-colors border ${activeWorkspaceId === w.id ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-transparent hover:border-border-strong'}`}
                   >
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: (w.color || '#6366F1') + '20' }}>
                       <div className="w-2.5 h-2.5 rounded-full" style={{ background: w.color || '#6366F1' }} />

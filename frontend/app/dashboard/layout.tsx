@@ -8,7 +8,7 @@ import {
   Brain, LayoutDashboard, FileText, MessageSquare, Layers,
   BarChart3, Settings, Users, ChevronDown, Bell, Search,
   Plus, ChevronsUpDown, Zap, X, Menu, ChevronRight, Key, Shield, CreditCard,
-  Activity, GitCompare, Sun, Moon, Workflow
+  Activity, GitCompare, Sun, Moon, Workflow, Loader2
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { Workspace } from '@/lib/types'
@@ -48,13 +48,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Custom Modals / Dropdowns
   const [newWorkspaceOpen, setNewWorkspaceOpen] = useState(false)
   const [newWsName, setNewWsName] = useState('')
-  const [newWsColor, setNewWsColor] = useState('#1a1a1f')
+  const [newWsColor, setNewWsColor] = useState('#6366F1')
+  const [wsCreating, setWsCreating] = useState(false)
+  const [wsError, setWsError] = useState('')
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [cmdSearch, setCmdSearch] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
-  const workspaceColors = ['#1a1a1f']
+  const workspaceColors = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#3B82F6', '#8B5CF6']
+
+  const handleCreateWorkspaceSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!newWsName.trim() || wsCreating) return
+    setWsCreating(true)
+    setWsError('')
+    try {
+      await createWorkspace(newWsName.trim(), '', newWsColor)
+      setNewWorkspaceOpen(false)
+      setNewWsName('')
+      setNewWsColor('#6366F1')
+    } catch (err: any) {
+      console.error(err)
+      setWsError(err?.message || 'Gagal membuat workspace. Pastikan koneksi atau sesi login sudah sesuai.')
+    } finally {
+      setWsCreating(false)
+    }
+  }
 
   const user = useAuthStore(state => state.user)
   const token = useAuthStore(state => state.token)
@@ -167,12 +187,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex flex-col gap-4">
+            <form onSubmit={handleCreateWorkspaceSubmit} className="flex flex-col gap-4">
+              {wsError && (
+                <div className="p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-medium">
+                  {wsError}
+                </div>
+              )}
               <div>
                 <label className="text-xs font-medium text-text-subtle mb-1.5 block">Workspace Name</label>
                 <input
                   id="new-workspace-name"
                   type="text"
+                  autoFocus
                   value={newWsName}
                   onChange={e => setNewWsName(e.target.value)}
                   placeholder="e.g. Legal — Q3 Review"
@@ -184,6 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="flex gap-2">
                   {workspaceColors.map(c => (
                     <button
+                      type="button"
                       key={c}
                       onClick={() => setNewWsColor(c)}
                       className={`w-7 h-7 rounded-full transition-all ${newWsColor === c ? 'ring-2 ring-foreground ring-offset-2 ring-offset-bg-panel' : 'hover:scale-110'}`}
@@ -194,6 +221,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
               <div className="flex gap-3 mt-1">
                 <button
+                  type="button"
                   onClick={() => setNewWorkspaceOpen(false)}
                   className="flex-1 py-2.5 rounded-xl border border-border-strong text-sm text-text-subtle hover:text-foreground hover:border-border-strong transition-all"
                 >
@@ -201,23 +229,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
                 <button
                   id="create-workspace-btn"
-                  disabled={!newWsName.trim()}
-                  onClick={async () => {
-                    try {
-                      await createWorkspace(newWsName, '')
-                      setNewWorkspaceOpen(false)
-                      setNewWsName('')
-                      setNewWsColor('#6366F1')
-                    } catch (e) {
-                      console.error(e)
-                    }
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20"
+                  type="submit"
+                  disabled={!newWsName.trim() || wsCreating}
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
                 >
-                  Create workspace
+                  {wsCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create workspace</span>
+                  )}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

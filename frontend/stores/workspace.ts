@@ -9,7 +9,7 @@ interface WorkspaceState {
   loading: boolean
   fetchWorkspaces: () => Promise<void>
   setActiveWorkspace: (w: Workspace) => void
-  createWorkspace: (name: string, description?: string) => Promise<void>
+  createWorkspace: (name: string, description?: string, color?: string) => Promise<void>
   updateWorkspace: (id: string, updates: Partial<Workspace>) => Promise<void>
   deleteWorkspace: (id: string) => Promise<void>
   updateAiSettings: (id: string, settings: any) => Promise<void>
@@ -40,8 +40,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
       },
       setActiveWorkspace: (w) => set({ activeWorkspace: w }),
-      createWorkspace: async (name, description) => {
-        const w = await api.createWorkspace({ name, description })
+      createWorkspace: async (name, description, color) => {
+        const w = await api.createWorkspace({ name, description, color })
         set((state) => ({
           workspaces: [...state.workspaces, w],
           activeWorkspace: w
