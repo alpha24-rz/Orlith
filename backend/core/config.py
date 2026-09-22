@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # AI Settings
     OPENROUTER_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    LLM_PROVIDER: str = "openrouter"
     LLM_MODEL: str = "deepseek/deepseek-v3.2-exp"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
     EMBEDDING_PROVIDER: str = "huggingface"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
 

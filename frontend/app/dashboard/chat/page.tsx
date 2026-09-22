@@ -1350,25 +1350,34 @@ function ChatPageInner() {
           const token = localStorage.getItem('auth_token')
           if (token) headers['Authorization'] = `Bearer ${token}`
           const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
-          if (convRes.ok) {
-            const data = await convRes.json()
-            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.created_at),
-              citations: m.citations || m.metadata_json?.citations,
-              confidence: m.confidence ?? m.metadata_json?.confidence,
-              model: m.model || m.metadata_json?.model,
-              queriesUsed: m.metadata_json?.queriesUsed,
-              source_mode: m.metadata_json?.source_mode,
-              retrieval_score: m.metadata_json?.retrieval_score,
-            }))
-            setMessages(mappedMessages)
+            if (convRes.ok) {
+              const data = await convRes.json()
+              if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+                const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  timestamp: new Date(m.created_at),
+                  citations: m.citations || m.metadata_json?.citations,
+                  confidence: m.confidence ?? m.metadata_json?.confidence,
+                  model: m.model || m.metadata_json?.model,
+                  queriesUsed: m.metadata_json?.queriesUsed,
+                  source_mode: m.metadata_json?.source_mode,
+                  retrieval_score: m.metadata_json?.retrieval_score,
+                }))
+                setMessages(prev => {
+                  const hasAssistantInMapped = mappedMessages.some(m => m.role === 'assistant')
+                  const hasAssistantInPrev = prev.some(m => m.role === 'assistant')
+                  if (!hasAssistantInMapped && hasAssistantInPrev) {
+                    return prev
+                  }
+                  return mappedMessages
+                })
+              }
+            }
+          } catch (e) {
+            console.error("Failed to refresh messages", e)
           }
-        } catch (e) {
-          console.error("Failed to refresh messages", e)
-        }
       }
     }
   }
@@ -1546,19 +1555,28 @@ function ChatPageInner() {
           const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
           if (convRes.ok) {
             const data = await convRes.json()
-            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.created_at),
-              citations: m.citations || m.metadata_json?.citations,
-              confidence: m.confidence ?? m.metadata_json?.confidence,
-              model: m.model || m.metadata_json?.model,
-              queriesUsed: m.metadata_json?.queriesUsed,
-              source_mode: m.metadata_json?.source_mode,
-              retrieval_score: m.metadata_json?.retrieval_score,
-            }))
-            setMessages(mappedMessages)
+            if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+              const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: new Date(m.created_at),
+                citations: m.citations || m.metadata_json?.citations,
+                confidence: m.confidence ?? m.metadata_json?.confidence,
+                model: m.model || m.metadata_json?.model,
+                queriesUsed: m.metadata_json?.queriesUsed,
+                source_mode: m.metadata_json?.source_mode,
+                retrieval_score: m.metadata_json?.retrieval_score,
+              }))
+              setMessages(prev => {
+                const hasAssistantInMapped = mappedMessages.some(m => m.role === 'assistant')
+                const hasAssistantInPrev = prev.some(m => m.role === 'assistant')
+                if (!hasAssistantInMapped && hasAssistantInPrev) {
+                  return prev
+                }
+                return mappedMessages
+              })
+            }
           }
         } catch (e) {
           console.error("Failed to refresh messages", e)

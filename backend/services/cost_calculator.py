@@ -49,8 +49,8 @@ def count_content_tokens(content: str | list | dict | int, model_name: str = "gp
 
 def calculate_cost(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> float:
     """Hitung estimasi biaya pemakaian model LLM dalam USD."""
-    provider = provider.lower()
-    model = model.lower()
+    provider = (provider or "ollama").lower()
+    model = (model or "").lower()
 
     if provider == "ollama":
         return 0.0

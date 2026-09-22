@@ -23,6 +23,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> str:
         payload = {
             "model": model,
@@ -34,6 +35,8 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         }
         if max_tokens > 0:
             payload["options"]["num_predict"] = max_tokens
+        if kwargs.get("response_format"):
+            payload["format"] = "json"
 
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
@@ -56,6 +59,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> AsyncIterator[str]:
         payload = {
             "model": model,
@@ -67,6 +71,8 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         }
         if max_tokens > 0:
             payload["options"]["num_predict"] = max_tokens
+        if kwargs.get("response_format"):
+            payload["format"] = "json"
 
         async with httpx.AsyncClient(timeout=60) as client:
             async with client.stream(

@@ -204,24 +204,22 @@ class StandardChatMode(BaseReasoningMode):
             yield format_sse_text(error_msg)
 
         finally:
-            yield "data: [DONE]\n\n"
+            # Save assistant message & history BEFORE yielding [DONE]
+            effective_provider = (
+                endpoint_name
+                or getattr(workspace, "active_llm_provider", None)
+                or getattr(settings, "LLM_PROVIDER", "ollama")
+            )
 
-            # Save query history
+            # 1. Save Assistant Message
             try:
-                history = QueryHistory(
-                    workspace_id=workspace.id,
-                    query_text=query,
-                    response_text=accumulated_text,
-                )
-                self.db.add(history)
-                
                 ai_msg = Message(
                     conversation_id=conversation_id,
                     role="assistant",
-                    content=accumulated_text,
-                    provider=endpoint_name,
+                    content=accumulated_text or "",
+                    provider=effective_provider,
                     model=chat_model,
-                    citations=citations,
+                    citations=citations if citations else None,
                     confidence=round(top_score, 2),
                     metadata_json={
                         "queriesUsed": meta_data.get("queriesUsed"),
@@ -230,22 +228,36 @@ class StandardChatMode(BaseReasoningMode):
                     }
                 )
                 self.db.add(ai_msg)
-                
                 await self.db.commit()
             except Exception as e:
-                logger.error(f"Failed to save history or message: {e}")
+                logger.error(f"Failed to save assistant message: {e}")
 
-            # Cost Tracking & Usage Log
+            # 2. Save Query History
+            try:
+                history = QueryHistory(
+                    workspace_id=workspace.id,
+                    query_text=query,
+                    response_text=accumulated_text or "",
+                )
+                self.db.add(history)
+                await self.db.commit()
+            except Exception as e:
+                logger.error(f"Failed to save query history: {e}")
+
+            # 3. Cost Tracking & Usage Log
             try:
                 from services.cost_calculator import log_usage
                 await log_usage(
                     db=self.db,
                     workspace_id=workspace.id,
-                    provider=endpoint_name,
+                    provider=effective_provider,
                     model=chat_model,
                     operation="chat",
                     prompt_content=messages,
-                    completion_content=accumulated_text,
+                    completion_content=accumulated_text or "",
                 )
             except Exception as e:
                 logger.error(f"Failed to log RAG usage: {e}")
+
+            # 4. Yield completion event to frontend AFTER DB commit is done
+            yield "data: [DONE]\n\n"

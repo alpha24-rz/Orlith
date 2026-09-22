@@ -32,14 +32,18 @@ class OpenRouterAdapter(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> str:
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            api_key=self.api_key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        call_kwargs = {
+            "model": model,
+            "messages": messages,
+            "api_key": self.api_key,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if kwargs.get("response_format"):
+            call_kwargs["response_format"] = kwargs["response_format"]
+        response = await litellm.acompletion(**call_kwargs)
         return response.choices[0].message.content
 
     async def stream_response(
@@ -48,15 +52,19 @@ class OpenRouterAdapter(ILLMProvider, IEmbeddingProvider):
         model: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        **kwargs,
     ) -> AsyncIterator[str]:
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            api_key=self.api_key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=True,
-        )
+        call_kwargs = {
+            "model": model,
+            "messages": messages,
+            "api_key": self.api_key,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if kwargs.get("response_format"):
+            call_kwargs["response_format"] = kwargs["response_format"]
+        response = await litellm.acompletion(**call_kwargs)
         async for chunk in response:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
@@ -149,6 +157,16 @@ class LLMGateway:
                     actual_model = f"openrouter/{actual_model}"
                 return OpenRouterAdapter(), actual_model
 
+            # 5. Fallback for Ollama (local server, no API key needed)
+            if provider_name == "ollama":
+                from services.ai.providers.ollama import OllamaProvider
+                return OllamaProvider(base_url=settings.OLLAMA_BASE_URL), model_name
+
+        # Fallback to Ollama if configured as default provider in settings
+        if getattr(settings, "LLM_PROVIDER", "").lower() == "ollama":
+            from services.ai.providers.ollama import OllamaProvider
+            return OllamaProvider(base_url=settings.OLLAMA_BASE_URL), settings.LLM_MODEL
+
         # Fallback to Gemini if configured and not offline
         if settings.GEMINI_API_KEY and gemini_health.state != "Offline":
             return InteractionsGeminiProvider(settings.GEMINI_API_KEY), "gemini-3.5-flash"
@@ -163,10 +181,13 @@ class LLMGateway:
     async def get_embedding_provider(
         self, workspace=None
     ) -> tuple[IEmbeddingProvider, str]:
-        # 1. Priority override: system-level local huggingface embeddings
+        # 1. Priority override: system-level local huggingface embeddings or ollama
         if settings.EMBEDDING_PROVIDER == "huggingface":
             model_name = settings.EMBEDDING_MODEL
             return LocalEmbeddingProvider(), model_name
+        elif settings.EMBEDDING_PROVIDER == "ollama":
+            from services.ai.providers.ollama import OllamaProvider
+            return OllamaProvider(base_url=settings.OLLAMA_BASE_URL), settings.EMBEDDING_MODEL
 
         # 2. Workspace active configuration
         if workspace and getattr(workspace, "active_embedding_provider", None):
@@ -176,6 +197,10 @@ class LLMGateway:
             if provider_name in ("huggingface", "local"):
                 actual_model = model_name if model_name != "default" else settings.EMBEDDING_MODEL
                 return LocalEmbeddingProvider(), actual_model
+            elif provider_name == "ollama":
+                from services.ai.providers.ollama import OllamaProvider
+                actual_model = model_name if model_name != "default" else settings.EMBEDDING_MODEL
+                return OllamaProvider(base_url=settings.OLLAMA_BASE_URL), actual_model
             
             # Fallback to system-level Gemini API key if provider is Gemini
             if provider_name == "gemini" and settings.GEMINI_API_KEY:
