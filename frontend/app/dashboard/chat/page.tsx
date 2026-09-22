@@ -8,14 +8,6 @@ import { formatRelativeTime } from '@/lib/utils'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import {
-  Brain, Send, FileText, ThumbsUp, ThumbsDown, Copy,
-  ChevronDown, Sparkles, Clock, RotateCcw, X, Zap,
-  MessageSquare, ChevronRight, Info, Search, Star,
-  Bot, Wrench, CheckCircle2, AlertCircle, Loader2, ChevronUp, Database,
-  FlaskConical, BookOpen, ListTree, Layers, Download, ExternalLink, ScrollText, Trash2, Check,
-  Pencil, RefreshCw, Code, ArrowUp, GitCompare, Compass, Plus, History, ArrowUpRight
-} from 'lucide-react'
 import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -23,29 +15,21 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 
 const PROMPT_SUGGESTIONS = [
   {
-    icon: FileText,
-    color: 'from-blue-500/20 to-indigo-500/20 text-indigo-400 border-indigo-500/30',
     title: 'Ringkasan Eksekutif',
     desc: 'Rangkum poin-poin utama, tujuan, dan kesimpulan dari dokumen.',
     query: 'Buatkan ringkasan eksekutif dan poin-poin penting dari dokumen yang ada.',
   },
   {
-    icon: Search,
-    color: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
     title: 'Temukan Fakta & Data Kunci',
     desc: 'Cari tanggal krusial, nilai finansial, dan pihak yang terlibat.',
     query: 'Ekstrak semua tanggal penting, angka finansial, dan pihak yang disebutkan dalam dokumen.',
   },
   {
-    icon: GitCompare,
-    color: 'from-violet-500/20 to-purple-500/20 text-violet-400 border-violet-500/30',
     title: 'Analisis & Perbandingan',
     desc: 'Bandingkan pasal, kewajiban, atau perubahan antar bagian dokumen.',
     query: 'Bandingkan kewajiban, hak, dan perbedaan ketentuan utama dalam dokumen ini.',
   },
   {
-    icon: Sparkles,
-    color: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30',
     title: 'Identifikasi Risiko & Rekomendasi',
     desc: 'Deteksi potensi klausul berisiko dan rekomendasi mitigasi.',
     query: 'Identifikasi potensi risiko atau klausul kritis dalam dokumen ini dan berikan rekomendasi strategi.',
@@ -91,14 +75,6 @@ const TOOL_LABELS: Record<string, string> = {
   semantic_search: 'Pencarian Semantik',
 }
 
-const TOOL_ICONS: Record<string, React.ReactNode> = {
-  search_documents: <Search className="w-3 h-3" />,
-  list_documents: <Database className="w-3 h-3" />,
-  get_document_metadata: <FileText className="w-3 h-3" />,
-  get_document_content: <FileText className="w-3 h-3" />,
-  semantic_search: <Search className="w-3 h-3" />,
-}
-
 function AgentStepsPanel({ steps, isRunning, streamingText }: {
   steps: AgentStep[]
   isRunning: boolean
@@ -108,7 +84,6 @@ function AgentStepsPanel({ steps, isRunning, streamingText }: {
 
   // Group tool_call + tool_result pairs
   const toolPairs: { call: AgentStep; result?: AgentStep }[] = []
-  const otherSteps: AgentStep[] = []
 
   const toolCallMap = new Map<string, AgentStep>()
   for (const s of steps) {
@@ -128,121 +103,80 @@ function AgentStepsPanel({ steps, isRunning, streamingText }: {
   if (!hasContent && !streamingText) return null
 
   return (
-    <div className="flex gap-3 mb-4 animate-fade-in">
-      <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-        <Bot className="w-4 h-4 text-foreground" />
+    <div className="flex flex-col mb-4 animate-fade-in max-w-2xl">
+      {/* Steps header */}
+      <div
+        className="flex items-center gap-2 mb-2 cursor-pointer group"
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <span className="text-xs font-semibold text-text-subtle group-hover:text-foreground transition-colors">
+          {isRunning && !streamingText
+            ? `Agent sedang bekerja... (${steps.filter(s => s.type === 'tool_call').length} langkah)`
+            : `Agent selesai (${toolPairs.length} langkah)`
+          }
+        </span>
+        {toolPairs.length > 0 && (
+          <span className="ml-auto text-xs text-text-muted hover:text-foreground">
+            {collapsed ? 'Lihat rincian ▾' : 'Sembunyikan ▴'}
+          </span>
+        )}
       </div>
-      <div className="flex-1 max-w-2xl">
-        {/* Steps header */}
-        <div
-          className="flex items-center gap-2 mb-2 cursor-pointer group"
-          onClick={() => setCollapsed(c => !c)}
-        >
-          <div className="flex items-center gap-1.5">
-            {isRunning && !streamingText ? (
-              <Loader2 className="w-3.5 h-3.5 text-violet-400 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            )}
-            <span className="text-xs font-semibold text-text-subtle group-hover:text-foreground transition-colors">
-              {isRunning && !streamingText
-                ? `Agent sedang bekerja... (langkah ${steps.filter(s => s.type === 'tool_call').length})`
-                : `Agent selesai — ${toolPairs.length} tool calls`
-              }
-            </span>
-          </div>
-          {toolPairs.length > 0 && (
-            <button className="ml-auto text-text-muted hover:text-foreground transition-colors">
-              {collapsed
-                ? <ChevronDown className="w-3 h-3" />
-                : <ChevronUp className="w-3 h-3" />
-              }
-            </button>
-          )}
-        </div>
 
-        {/* Tool call steps */}
-        {!collapsed && toolPairs.length > 0 && (
-          <div className="bg-background border border-border-subtle rounded-xl overflow-hidden mb-2">
-            {toolPairs.map((pair, i) => (
-              <div key={i} className={`px-3 py-2.5 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
-                <div className="flex items-center gap-2">
-                  {/* Step number */}
-                  <div className="w-5 h-5 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
-                    <span className="text-[9px] font-black text-violet-400">{i + 1}</span>
-                  </div>
-                  {/* Tool icon */}
-                  <div className="text-violet-400">
-                    {TOOL_ICONS[pair.call.tool || ''] || <Wrench className="w-3 h-3" />}
-                  </div>
-                  {/* Tool name */}
-                  <span className="text-xs font-semibold text-foreground">
-                    {TOOL_LABELS[pair.call.tool || ''] || pair.call.tool}
+      {/* Tool call steps */}
+      {!collapsed && toolPairs.length > 0 && (
+        <div className="bg-bg-panel border border-border-strong rounded-xl overflow-hidden mb-2">
+          {toolPairs.map((pair, i) => (
+            <div key={i} className={`px-3 py-2 text-xs ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-text-muted font-mono">[{i + 1}]</span>
+                <span className="font-medium text-foreground">
+                  {TOOL_LABELS[pair.call.tool || ''] || pair.call.tool}
+                </span>
+                {pair.call.args && Object.keys(pair.call.args).length > 0 && (
+                  <span className="text-[11px] text-text-muted truncate max-w-[200px]">
+                    {Object.entries(pair.call.args)
+                      .map(([k, v]) => `${k}: "${String(v).slice(0, 30)}"`)
+                      .join(', ')}
                   </span>
-                  {/* Args preview */}
-                  {pair.call.args && Object.keys(pair.call.args).length > 0 && (
-                    <span className="text-[10px] text-text-muted truncate max-w-[180px]">
-                      {Object.entries(pair.call.args)
-                        .map(([k, v]) => `${k}: "${String(v).slice(0, 30)}${String(v).length > 30 ? '...' : ''}"`)
-                        .join(', ')
-                      }
-                    </span>
-                  )}
-                  {/* Status */}
-                  <div className="ml-auto shrink-0">
-                    {pair.result ? (
-                      <div className="flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        {pair.result.latency_ms && (
-                          <span className="text-[9px] text-text-muted">{pair.result.latency_ms}ms</span>
-                        )}
-                      </div>
-                    ) : (
-                      <Loader2 className="w-3 h-3 text-violet-400 animate-spin" />
-                    )}
-                  </div>
-                </div>
-                {/* Result preview */}
-                {pair.result?.result && (
-                  <div className="mt-1.5 ml-7 text-[10px] text-text-muted">
-                    {(() => {
-                      const r = pair.result.result
-                      if (r.hits_found !== undefined) return `${r.hits_found} chunks ditemukan`
-                      if (r.total_documents !== undefined) return `${r.total_documents} dokumen di workspace`
-                      if (r.filename) return `📄 ${r.filename}`
-                      if (r.content) return `${String(r.content).slice(0, 60)}...`
-                      if (r.error) return `⚠ ${r.error}`
-                      return null
-                    })()}
-                  </div>
                 )}
+                <span className="ml-auto text-[10px] text-text-muted">
+                  {pair.result ? (pair.result.latency_ms ? `${pair.result.latency_ms}ms` : 'Selesai') : 'Memproses...'}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Streaming answer */}
-        {streamingText && (
-          <div className="bg-bg-input border border-border-strong rounded-2xl rounded-tl-sm px-4 py-3">
-            <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-              {streamingText}
-              <span className="inline-block w-1.5 h-4 bg-violet-500 ml-1 align-middle animate-caret">|</span>
+              {pair.result?.result && (
+                <div className="mt-1 text-[11px] text-text-muted">
+                  {(() => {
+                    const r = pair.result.result
+                    if (r.hits_found !== undefined) return `${r.hits_found} kutipan ditemukan`
+                    if (r.total_documents !== undefined) return `${r.total_documents} dokumen di workspace`
+                    if (r.filename) return r.filename
+                    if (r.content) return `${String(r.content).slice(0, 70)}...`
+                    if (r.error) return r.error
+                    return null
+                  })()}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {/* Loading state before answer */}
-        {isRunning && !streamingText && (
-          <div className="flex items-center gap-2 text-text-muted text-xs">
-            <div className="flex gap-1">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="w-1 h-1 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
-            </div>
-            <span>Menganalisis dokumen...</span>
+      {/* Loading state before answer */}
+      {isRunning && !streamingText && (
+        <div className="text-text-muted text-xs mt-1">
+          Menganalisis dokumen...
+        </div>
+      )}
+
+      {/* Streaming answer */}
+      {streamingText && (
+        <div className="bg-bg-panel border border-border-strong rounded-xl p-4 mt-2">
+          <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+            {streamingText}
+            <span className="inline-block w-1.5 h-4 bg-foreground ml-1 align-middle animate-caret">|</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -273,29 +207,25 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
     <div ref={containerRef} className="relative inline-block">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg-panel border border-border-strong hover:border-indigo-500/40 hover:bg-indigo-600/5 text-xs text-indigo-400 transition-all duration-200"
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-border-strong hover:bg-bg-hover text-xs text-text-subtle hover:text-foreground transition-colors cursor-pointer"
       >
-        <FileText className="w-3 h-3" />
-        <span className="max-w-[120px] truncate text-[11px]">{citation.docName.replace(/\.[^.]+$/, '')}</span>
-        <span className="text-text-muted">p.{citation.page}</span>
-        <sup className="text-[9px] font-bold">[{num}]</sup>
+        <span className="max-w-[120px] truncate text-[11px] font-medium">{citation.docName.replace(/\.[^.]+$/, '')}</span>
+        <span className="text-[10px] text-text-muted">p.{citation.page}</span>
+        <sup className="text-[9px] font-bold text-indigo-400">[{num}]</sup>
       </button>
       {expanded && (
-        <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-border-strong bg-bg-input shadow-2xl shadow-black/50 p-4 z-20">
+        <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-border-strong bg-bg-panel shadow-2xl p-4 z-20">
           {/* Header */}
           <div className="flex items-start gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-              <span className="text-xs font-black text-indigo-400">{num}</span>
+            <div className="w-6 h-6 rounded border border-border-strong flex items-center justify-center shrink-0 text-xs font-bold text-foreground">
+              {num}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground truncate">{citation.docName}</p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] text-text-muted">Halaman {citation.page}</span>
                 {relevancePct !== null && (
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${relevancePct >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
-                    relevancePct >= 60 ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-[#2A2A3A] text-text-subtle'
-                    }`}>
+                  <span className="text-[10px] text-text-muted">
                     {relevancePct}% match
                   </span>
                 )}
@@ -303,7 +233,7 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
             </div>
           </div>
           {/* Snippet / Full Text */}
-          <div className="bg-bg-panel rounded-lg p-3 mb-3 border border-border-subtle">
+          <div className="bg-bg-input rounded-md p-3 mb-3 border border-border-subtle">
             <p className="text-[11px] text-text-subtle italic leading-relaxed line-clamp-5">
               &ldquo;{citation.fullText || citation.snippet}&rdquo;
             </p>
@@ -311,9 +241,8 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
           {/* Actions */}
           <button
             onClick={(e) => { e.stopPropagation(); onOpenDoc(); setExpanded(false); }}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-xs text-indigo-400 hover:text-indigo-300 transition-all"
+            className="w-full py-1.5 rounded-md border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-colors cursor-pointer"
           >
-            <FileText className="w-3 h-3" />
             Buka Dokumen
           </button>
         </div>
@@ -401,19 +330,16 @@ function CodeBlock({ language, codeString, props }: { language: string; codeStri
   }
 
   return (
-    <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#121316] shadow-md shadow-black/20">
-      <div className="flex items-center justify-between px-4 py-2 bg-black/60 border-b border-border-subtle/50 text-[11px] font-mono text-text-muted">
-        <span className="flex items-center gap-1.5 uppercase font-semibold tracking-wider text-indigo-300">
-          <Code className="w-3.5 h-3.5 text-indigo-400" />
+    <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#121316]">
+      <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-border-subtle text-[11px] font-mono text-text-muted">
+        <span className="uppercase font-medium text-text-subtle">
           {language || 'code'}
         </span>
         <button
           onClick={handleCopyCode}
-          className="flex items-center gap-1.5 text-xs text-text-subtle hover:text-foreground transition-colors px-2 py-0.5 rounded-md hover:bg-white/10 cursor-pointer"
-          title={isCopied ? "Tersalin!" : "Salin kode"}
+          className="text-[11px] text-text-subtle hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-white/10 cursor-pointer"
         >
-          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          <span className="text-[11px] font-medium">{isCopied ? 'Tersalin' : 'Salin'}</span>
+          {isCopied ? 'Tersalin' : 'Salin'}
         </button>
       </div>
       <div className="text-[13px] overflow-x-auto leading-relaxed">
@@ -519,26 +445,24 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
     }
 
     return (
-      <div className="flex flex-col items-end mb-6 animate-fade-in group">
-        <div className="max-w-xl bg-gradient-to-r from-indigo-600/15 to-violet-600/15 border border-indigo-500/25 rounded-2xl rounded-tr-sm px-4.5 py-3.5 shadow-sm shadow-indigo-500/5">
+      <div className="flex flex-col items-end mb-6 animate-fade-in group w-full">
+        <div className="max-w-xl bg-bg-panel border border-border-strong rounded-2xl px-4.5 py-3 shadow-xs">
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
-        <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <span className="text-[10px] text-text-muted mr-1">{formatRelativeTime(message.timestamp)}</span>
+        <div className="flex items-center gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[10px] text-text-muted">{formatRelativeTime(message.timestamp)}</span>
           <button
             onClick={copy}
-            className="p-1 rounded-md hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
-            title={copied ? 'Disalin!' : 'Salin pertanyaan'}
+            className="text-[10px] text-text-muted hover:text-foreground transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5"
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Disalin' : 'Salin'}
           </button>
           {onEditSubmit && (
             <button
               onClick={() => setIsEditing(true)}
-              className="p-1 rounded-md hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
-              title="Edit pertanyaan"
+              className="text-[10px] text-text-muted hover:text-foreground transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5"
             >
-              <Pencil className="w-3 h-3" />
+              Edit
             </button>
           )}
         </div>
@@ -574,7 +498,7 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
         return <CodeBlock language={language} codeString={codeString} props={props} />
       }
       return (
-        <code {...props} className={`${className || ''} bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20 font-mono text-[12px]`}>
+        <code {...props} className={`${className || ''} bg-white/5 text-foreground px-1.5 py-0.5 rounded border border-border-subtle font-mono text-[12px]`}>
           {children}
         </code>
       )
@@ -582,40 +506,41 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   }
 
   return (
-    <div className="flex gap-3.5 mb-8 animate-fade-in group">
-      {/* AI Avatar */}
-      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600/30 to-violet-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-indigo-500/10">
-        <Brain className="w-4 h-4 text-indigo-400" />
+    <div className="flex flex-col mb-8 animate-fade-in group w-full">
+      {/* Header author line */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-semibold text-foreground tracking-wide">Orlith</span>
+        {message.model && (
+          <span className="text-[10px] text-text-muted font-mono">{message.model}</span>
+        )}
       </div>
 
-      <div className="flex-1 max-w-3xl lg:max-w-4xl min-w-0">
-        <div className="bg-bg-input/60 border border-border-strong/80 rounded-2xl rounded-tl-sm px-5 py-4 mb-2.5 shadow-sm shadow-black/10 backdrop-blur-sm">
+      <div className="w-full min-w-0">
+        <div className="text-sm text-foreground/90 leading-relaxed mb-3">
           {hasInlineCitations ? (
-            <div className="text-sm text-foreground/90 leading-relaxed">
-              <div className="prose prose-invert prose-sm max-w-none
-                [&_strong]:text-foreground [&_strong]:font-semibold
-                [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
-                [&_th]:px-4 [&_th]:py-3 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
-                [&_td]:px-4 [&_td]:py-3 [&_td]:border-b [&_td]:border-border-subtle/50
-                [&_tr:last-child_td]:border-0
-                [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
-              ">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={renderers}
-                >
-                  {message.content}
-                </ReactMarkdown>
-              </div>
+            <div className="prose prose-invert prose-sm max-w-none
+              [&_strong]:text-foreground [&_strong]:font-semibold
+              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
+              [&_th]:px-4 [&_th]:py-2.5 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
+              [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border-subtle/50
+              [&_tr:last-child_td]:border-0
+              [&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
+            ">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={renderers}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
           ) : (
             <div className="prose prose-invert prose-sm max-w-none text-foreground/90 leading-relaxed
               [&_strong]:text-foreground [&_strong]:font-semibold
-              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
-              [&_th]:px-4 [&_th]:py-3 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
-              [&_td]:px-4 [&_td]:py-3 [&_td]:border-b [&_td]:border-border-subtle/50
+              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
+              [&_th]:px-4 [&_th]:py-2.5 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
+              [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border-subtle/50
               [&_tr:last-child_td]:border-0
-              [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
+              [&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
             ">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -629,18 +554,17 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
 
         {/* Active citation detail panel */}
         {activeCitation && (
-          <div ref={citationPanelRef} className="mb-3 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-3.5 animate-fade-in shadow-lg">
+          <div ref={citationPanelRef} className="mb-3 rounded-lg border border-border-strong bg-bg-panel p-3.5 animate-fade-in">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5 text-indigo-400" />
                 <span className="text-xs font-semibold text-foreground">{activeCitation.docName}</span>
-                <span className="text-[10px] bg-indigo-500/15 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">p.{activeCitation.page}</span>
+                <span className="text-[10px] text-text-muted">Halaman {activeCitation.page}</span>
                 {activeCitation.relevanceScore && (
-                  <span className="text-[10px] text-emerald-400 font-semibold">{Math.round(activeCitation.relevanceScore * 100)}% match</span>
+                  <span className="text-[10px] text-text-muted">{Math.round(activeCitation.relevanceScore * 100)}% match</span>
                 )}
               </div>
-              <button onClick={() => setActiveCitation(null)} className="text-text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
-                <X className="w-3.5 h-3.5" />
+              <button onClick={() => setActiveCitation(null)} className="text-xs text-text-muted hover:text-foreground cursor-pointer">
+                Tutup
               </button>
             </div>
             <p className="text-[12px] text-text-subtle italic leading-relaxed">
@@ -648,9 +572,9 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
             </p>
             <button
               onClick={() => { onOpenDoc(activeCitation); setActiveCitation(null); }}
-              className="mt-2.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
+              className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors cursor-pointer"
             >
-              Buka dokumen di viewer <ChevronRight className="w-3.5 h-3.5" />
+              Buka dokumen di viewer →
             </button>
           </div>
         )}
@@ -663,29 +587,22 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
               <CitationPill key={i} citation={c} index={i} onOpenDoc={() => onOpenDoc(c)} />
             ))}
             {message.source_mode && message.source_mode === 'DOCUMENT' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
-                <CheckCircle2 className="w-3 h-3" />
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium border border-border-strong text-text-subtle">
                 Dokumen Terverifikasi
               </span>
             )}
             {message.source_mode && message.source_mode === 'HYBRID' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-indigo-500/10 border-indigo-500/20 text-indigo-400">
-                <Layers className="w-3 h-3" />
-                Dokumen + Pengetahuan Umum
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium border border-border-strong text-text-subtle">
+                Dokumen + Umum
               </span>
             )}
             {message.source_mode && message.source_mode === 'GENERAL' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-amber-500/10 border-amber-500/20 text-amber-400" title="Tidak ditemukan dokumen relevan">
-                <AlertCircle className="w-3 h-3" />
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium border border-border-strong text-text-subtle">
                 Pengetahuan Umum
               </span>
             )}
             {message.retrieval_score && message.retrieval_score > 0 && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${message.retrieval_score > 0.7 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                message.retrieval_score > 0.45 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                  'bg-red-500/10 border-red-500/20 text-red-400'
-                }`} title="Similarity Score">
-                <Search className="w-2.5 h-2.5" />
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono text-text-muted border border-border-subtle">
                 {Math.round(message.retrieval_score * 100)}% Match
               </span>
             )}
@@ -693,37 +610,31 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
         )}
 
         {/* Meta Bar */}
-        <div className="flex items-center gap-3 text-text-muted">
-          {message.model && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-white/5 border border-white/5 font-mono">{message.model}</span>
-          )}
-          <span className="text-[11px]">{formatRelativeTime(message.timestamp)}</span>
-          <div className="flex items-center gap-1 ml-auto opacity-70 group-hover:opacity-100 transition-opacity">
-            <button onClick={copy} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer" title={copied ? 'Disalin!' : 'Salin respons'}>
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+        <div className="flex items-center gap-3 text-text-muted pt-1">
+          <span className="text-[11px] text-text-muted">{formatRelativeTime(message.timestamp)}</span>
+          <div className="flex items-center gap-2 ml-auto opacity-70 group-hover:opacity-100 transition-opacity">
+            <button onClick={copy} className="text-[11px] text-text-muted hover:text-foreground transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5">
+              {copied ? 'Disalin' : 'Salin'}
             </button>
             {onRegenerate && (
               <button
                 onClick={() => onRegenerate(message.id)}
-                className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
-                title="Regenerasi respon"
+                className="text-[11px] text-text-muted hover:text-foreground transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                Regenerasi
               </button>
             )}
             <button
               onClick={() => setFeedback('up')}
-              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'up' ? 'text-emerald-400' : 'text-text-muted hover:text-foreground'}`}
-              title="Bagus"
+              className={`text-[11px] transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5 ${feedback === 'up' ? 'text-foreground font-semibold' : 'text-text-muted hover:text-foreground'}`}
             >
-              <ThumbsUp className="w-3.5 h-3.5" />
+              Bagus
             </button>
             <button
               onClick={() => setFeedback('down')}
-              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'down' ? 'text-red-400' : 'text-text-muted hover:text-foreground'}`}
-              title="Kurang relevan"
+              className={`text-[11px] transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5 ${feedback === 'down' ? 'text-foreground font-semibold' : 'text-text-muted hover:text-foreground'}`}
             >
-              <ThumbsDown className="w-3.5 h-3.5" />
+              Kurang
             </button>
           </div>
         </div>
@@ -792,121 +703,79 @@ function DeepResearchPanel({
   )
 
   return (
-    <div className="flex gap-3 mb-4 animate-fade-in">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 mt-0.5">
-        <FlaskConical className="w-4 h-4 text-foreground" />
-      </div>
-      <div className="flex-1 max-w-2xl">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-3">
-          {isRunning && !isDone ? (
-            <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          ) : isDone ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-          ) : hasError ? (
-            <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-          ) : (
-            <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-          )}
-          <span className="text-xs font-semibold text-foreground">
-            {isDone ? 'Laporan Riset Selesai' :
-              hasError ? 'Riset Gagal' :
-                writingReport ? 'Menulis Laporan...' :
-                  'Deep Research Berjalan'}
+    <div className="flex flex-col mb-4 animate-fade-in max-w-2xl bg-bg-panel border border-border-strong rounded-xl p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3 border-b border-border-subtle pb-2">
+        <span className="text-xs font-semibold text-foreground">
+          {isDone ? 'Laporan Riset Selesai' :
+            hasError ? 'Riset Gagal' :
+              writingReport ? 'Menulis Laporan...' :
+                'Deep Research Berjalan...'}
+        </span>
+        {isDone && doneEvent && (
+          <span className="text-[10px] text-text-muted">
+            {totalChunks} kutipan · {totalSources} sumber
           </span>
-          {isDone && doneEvent && (
-            <span className="text-[10px] text-text-muted ml-auto">
-              {totalChunks} chunks · {totalSources} sumber
-            </span>
-          )}
-        </div>
+        )}
+      </div>
 
-        {/* Sub-questions plan */}
-        {subQuestions.length > 0 && (
-          <div className="bg-background border border-border-subtle rounded-xl p-3 mb-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <ListTree className="w-3 h-3 text-emerald-400" />
-              <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wide">Rencana Riset</span>
-            </div>
+      {/* Sub-questions plan */}
+      {subQuestions.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Rencana Riset</div>
+          <div className="space-y-1">
             {subQuestions.map((q, i) => (
-              <div key={i} className="flex items-start gap-2 py-1">
-                <div className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-[8px] font-black text-emerald-400">{i + 1}</span>
-                </div>
-                <span className="text-[11px] text-foreground/80 leading-relaxed">{q}</span>
-                {/* Status dot per question */}
-                {(() => {
-                  const foundEvt = events.find(e => e.event === 'synthesized' && e.index === i + 1)
-                  const searchEvt = events.find(e => e.event === 'searching' && e.index === i + 1)
-                  return foundEvt ? (
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5 ml-auto" />
-                  ) : searchEvt ? (
-                    <Loader2 className="w-3 h-3 text-emerald-400 animate-spin shrink-0 mt-0.5 ml-auto" />
-                  ) : null
-                })()}
+              <div key={i} className="flex items-start gap-2 text-[11px] text-text-subtle">
+                <span className="text-text-muted font-mono">{i + 1}.</span>
+                <span className="leading-relaxed">{q}</span>
               </div>
             ))}
           </div>
-        )}
-
-        {/* Progress log */}
-        <div className="space-y-1 mb-3">
-          {progressSteps.map((evt, i) => (
-            <div key={i} className="flex items-center gap-2 text-[11px]">
-              {evt.event === 'error' ? (
-                <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
-              ) : evt.event === 'done' ? (
-                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-              ) : (
-                <div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/30 shrink-0" />
-              )}
-              <span className={`${evt.event === 'error' ? 'text-red-400' :
-                evt.event === 'done' ? 'text-emerald-400 font-medium' :
-                  'text-text-subtle'
-                }`}>
-                {evt.event === 'searching' && evt.question
-                  ? `Mencari: "${evt.question.slice(0, 50)}${evt.question.length > 50 ? '...' : ''}"` :
-                  evt.event === 'synthesized'
-                    ? `Selesai Q${evt.index}: ${evt.chunks_found} chunks` :
-                    evt.event === 'plan'
-                      ? `${evt.count} sub-questions dihasilkan` :
-                      evt.event === 'iterating'
-                        ? `Gap filling: ${evt.reason}` :
-                        evt.event === 'writing_report'
-                          ? `Menulis laporan dari ${evt.total_chunks} chunks, ${evt.total_sources} sumber...` :
-                          evt.event === 'done'
-                            ? `Laporan selesai · ${evt.report_length?.toLocaleString()} karakter` :
-                            evt.event === 'error'
-                              ? (evt.message || 'Terjadi kesalahan') :
-                              RESEARCH_STEP_LABELS[evt.event] || evt.event
-                }
-              </span>
-            </div>
-          ))}
-
-          {/* Running indicator */}
-          {isRunning && !isDone && !hasError && (
-            <div className="flex items-center gap-2 text-[11px]">
-              <Loader2 className="w-3 h-3 text-emerald-400 animate-spin shrink-0" />
-              <span className="text-text-muted">
-                {writingReport ? 'Menyusun laporan final...' : 'Menganalisis dokumen...'}
-              </span>
-            </div>
-          )}
         </div>
+      )}
 
-        {/* View Report button */}
-        {isDone && finalJobId && (
-          <button
-            onClick={onViewReport}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-          >
-            <ScrollText className="w-3.5 h-3.5" />
-            Lihat Laporan Lengkap
-            <ExternalLink className="w-3 h-3 opacity-70" />
-          </button>
+      {/* Progress log */}
+      <div className="space-y-1 mb-3 text-[11px] text-text-muted">
+        {progressSteps.map((evt, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span>·</span>
+            <span>
+              {evt.event === 'searching' && evt.question
+                ? `Mencari: "${evt.question.slice(0, 50)}${evt.question.length > 50 ? '...' : ''}"` :
+                evt.event === 'synthesized'
+                  ? `Selesai bagian ${evt.index}: ${evt.chunks_found} kutipan` :
+                  evt.event === 'plan'
+                    ? `${evt.count} sub-pertanyaan disusun` :
+                    evt.event === 'iterating'
+                      ? `Melengkapi data: ${evt.reason}` :
+                      evt.event === 'writing_report'
+                        ? `Menyusun laporan dari ${evt.total_chunks} kutipan...` :
+                        evt.event === 'done'
+                          ? `Laporan final selesai (${evt.report_length?.toLocaleString()} karakter)` :
+                          evt.event === 'error'
+                            ? (evt.message || 'Terjadi kesalahan') :
+                            RESEARCH_STEP_LABELS[evt.event] || evt.event
+              }
+            </span>
+          </div>
+        ))}
+
+        {isRunning && !isDone && !hasError && (
+          <div className="text-[11px] text-text-muted">
+            {writingReport ? 'Menyusun laporan final...' : 'Menganalisis dokumen...'}
+          </div>
         )}
       </div>
+
+      {/* View Report button */}
+      {isDone && finalJobId && (
+        <button
+          onClick={onViewReport}
+          className="w-full py-2 rounded-md bg-foreground text-background text-xs font-medium hover:opacity-90 transition-all cursor-pointer"
+        >
+          Buka Laporan Riset
+        </button>
+      )}
     </div>
   )
 }
@@ -940,32 +809,29 @@ function ResearchReportModal({
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       <div className="relative z-10 w-full max-w-4xl rounded-2xl border border-border-strong bg-bg-panel shadow-2xl shadow-black/70 flex flex-col overflow-hidden animate-fade-in">
         {/* Modal Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-border-subtle bg-bg-input shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center">
-            <FlaskConical className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-foreground">Laporan Riset Mendalam</div>
-            <div className="text-[10px] text-text-muted truncate">{query}</div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-bg-input shrink-0">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-foreground">Laporan Riset</div>
+            <div className="text-xs text-text-muted truncate mt-0.5">{query}</div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={copyReport}
-              title="Salin laporan"
-              className="p-2 rounded-lg text-text-muted hover:text-foreground hover:bg-bg-hover transition-all"
+              className="px-2.5 py-1 text-xs text-text-muted hover:text-foreground hover:bg-bg-hover rounded transition-colors"
             >
-              <Copy className="w-3.5 h-3.5" />
+              Salin
             </button>
             <button
               onClick={downloadReport}
-              title="Unduh sebagai Markdown"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 text-emerald-400 text-xs font-medium transition-all"
+              className="px-2.5 py-1 text-xs border border-border-subtle text-text-muted hover:text-foreground hover:bg-bg-hover rounded transition-colors"
             >
-              <Download className="w-3 h-3" />
-              .md
+              Unduh .md
             </button>
-            <button onClick={onClose} className="p-2 rounded-lg text-text-muted hover:text-foreground hover:bg-bg-hover transition-all">
-              <X className="w-4 h-4" />
+            <button
+              onClick={onClose}
+              className="px-2.5 py-1 text-xs text-text-muted hover:text-foreground rounded transition-colors"
+            >
+              Tutup
             </button>
           </div>
         </div>
@@ -1779,39 +1645,29 @@ function ChatPageInner() {
       {/* Main chat */}
       <div className="flex-1 flex flex-col min-w-0 bg-background h-full">
         {/* Top Context Header Bar */}
-        <div className="h-14 border-b border-border-subtle/80 bg-background/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between shrink-0 z-10">
+        <div className="h-13 border-b border-border-subtle bg-background px-4 sm:px-6 flex items-center justify-between shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
             {/* Toggle History Button */}
             <button
               onClick={() => setHistoryDrawerOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-subtle bg-bg-panel hover:bg-bg-hover hover:border-border-strong text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
-              title="Lihat riwayat percakapan"
+              className="px-2.5 py-1 rounded border border-border-strong hover:bg-bg-hover text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
             >
-              <History className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span className="hidden sm:inline">Riwayat</span>
-              {conversations.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/15 text-indigo-400 font-bold leading-none">
-                  {conversations.length}
-                </span>
-              )}
+              Riwayat {conversations.length > 0 && `(${conversations.length})`}
             </button>
 
-            <div className="h-4 w-px bg-border-strong hidden sm:block" />
+            <span className="text-text-muted text-xs">/</span>
 
             {/* Active Conversation Title */}
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold text-foreground truncate max-w-[140px] sm:max-w-[240px] md:max-w-md">
-                {activeConversationId
-                  ? conversations.find(c => c.id === activeConversationId)?.title || 'Percakapan Aktif'
-                  : 'Percakapan Baru'}
-              </span>
-            </div>
+            <span className="text-xs font-medium text-foreground truncate max-w-[140px] sm:max-w-[240px] md:max-w-md">
+              {activeConversationId
+                ? conversations.find(c => c.id === activeConversationId)?.title || 'Percakapan Aktif'
+                : 'Percakapan Baru'}
+            </span>
 
-            {/* Active Workspace Badge */}
+            {/* Active Workspace */}
             {activeWorkspace && (
-              <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 truncate max-w-[160px]">
-                <Database className="w-3 h-3 text-indigo-400 shrink-0" />
-                <span className="truncate">{activeWorkspace.name}</span>
+              <span className="hidden md:inline text-[11px] text-text-muted truncate max-w-[160px]">
+                · {activeWorkspace.name}
               </span>
             )}
           </div>
@@ -1825,10 +1681,9 @@ function ChatPageInner() {
                 setMessages([])
                 setInput('')
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-all cursor-pointer active:scale-95"
+              className="px-3 py-1 rounded border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-all cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">New Chat</span>
+              + New Chat
             </button>
           </div>
         </div>
@@ -1836,57 +1691,39 @@ function ChatPageInner() {
         {/* Messages scroll area */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 flex flex-col scrollbar-none">
           {loadingThread && messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-text-muted animate-pulse">
-              <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
-              <span className="text-xs font-semibold tracking-wide">Memuat percakapan...</span>
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 py-16 text-text-muted">
+              <span className="text-xs font-medium">Memuat percakapan...</span>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 max-w-3xl mx-auto w-full animate-fade-in">
-              {/* Glowing Brand Emblem */}
-              <div className="relative mb-6">
-                <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-pink-500/20 blur-xl opacity-70 animate-pulse" />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-b from-bg-panel to-bg-input border border-indigo-500/30 shadow-2xl flex items-center justify-center">
-                  <Brain className="w-8 h-8 text-indigo-400" />
-                </div>
-              </div>
-
-              {/* Title & Subtitle */}
-              <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">
-                What can I help you analyze today?
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-16 max-w-2xl mx-auto w-full animate-fade-in">
+              {/* Clean Typographic Headline */}
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground mb-3">
+                What would you like to know?
               </h2>
-              <p className="text-sm text-text-subtle max-w-md mb-8 leading-relaxed">
-                Tanyakan apa saja seputar dokumen Anda. Orlith akan mencari, menganalisis, dan memberikan jawaban dengan sitasi yang terverifikasi.
+              <p className="text-sm text-text-muted max-w-md mb-10 leading-relaxed">
+                Tanyakan apa saja seputar dokumen Anda. Orlith akan mencari, menganalisis, dan menyertakan sitasi halaman yang terverifikasi.
               </p>
 
-              {/* Bento Prompt Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full text-left">
-                {PROMPT_SUGGESTIONS.map((item, i) => {
-                  const Icon = item.icon
-                  return (
-                    <button
-                      key={i}
-                      id={`suggested-query-${i}`}
-                      onClick={() => {
-                        setInput(item.query)
-                        inputRef.current?.focus()
-                      }}
-                      className="group relative flex items-start gap-3.5 p-4 rounded-2xl border border-border-strong/80 bg-bg-panel/60 hover:bg-bg-hover hover:border-indigo-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/5 text-left cursor-pointer"
-                    >
-                      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} border flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform`}>
-                        <Icon className="w-4.5 h-4.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-foreground group-hover:text-indigo-400 transition-colors flex items-center justify-between">
-                          <span>{item.title}</span>
-                          <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400" />
-                        </div>
-                        <div className="text-[11px] text-text-subtle mt-1 line-clamp-2 leading-relaxed">
-                          {item.desc}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+              {/* Bento Prompt Grid - No Icons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full text-left">
+                {PROMPT_SUGGESTIONS.map((item, i) => (
+                  <button
+                    key={i}
+                    id={`suggested-query-${i}`}
+                    onClick={() => {
+                      setInput(item.query)
+                      inputRef.current?.focus()
+                    }}
+                    className="p-4 rounded-xl border border-border-strong/70 bg-bg-panel/40 hover:bg-bg-hover hover:border-border-strong transition-all text-left cursor-pointer group"
+                  >
+                    <div className="text-xs font-semibold text-foreground group-hover:text-indigo-300 transition-colors">
+                      {item.title}
+                    </div>
+                    <div className="text-xs text-text-muted mt-1.5 leading-relaxed">
+                      {item.desc}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
@@ -1903,7 +1740,7 @@ function ChatPageInner() {
                   onRegenerate={handleRegenerate}
                 />
               ))}
-              {/* Research Panel — tampil saat deep research aktif/selesai */}
+              {/* Research Panel */}
               {(researchRunning || researchEvents.length > 0) && (
                 <DeepResearchPanel
                   events={researchEvents}
@@ -1912,7 +1749,7 @@ function ChatPageInner() {
                   finalJobId={researchJobId}
                 />
               )}
-              {/* Agent Steps Panel — tampil saat agent mode aktif */}
+              {/* Agent Steps Panel */}
               {agentMode && (agentRunning || agentSteps.length > 0) && (
                 <AgentStepsPanel
                   steps={agentSteps}
@@ -1922,28 +1759,17 @@ function ChatPageInner() {
               )}
               {/* Regular streaming indicator */}
               {loading && !agentMode && (
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-indigo-500/10 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/10">
-                    <Brain className="w-4 h-4 text-indigo-400 animate-pulse" />
-                  </div>
-                  <div className="flex-1 max-w-3xl">
-                    <div className="bg-bg-panel/80 border border-border-strong/80 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm">
-                      {streamingText ? (
-                        <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                          {streamingText}
-                          <span className="inline-block w-1.5 h-4 bg-indigo-500 ml-1.5 align-middle animate-caret">|</span>
-                        </p>
-                      ) : (
-                        <div className="flex items-center gap-3 text-text-muted py-1">
-                          <div className="flex gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <div className="w-2 h-2 rounded-full bg-indigo-300 animate-bounce" style={{ animationDelay: '300ms' }} />
-                          </div>
-                          <span className="text-xs font-medium text-text-subtle">Mencari referensi & menghasilkan jawaban...</span>
-                        </div>
-                      )}
-                    </div>
+                <div className="flex flex-col mb-6">
+                  <div className="text-xs font-semibold text-text-muted mb-1">Orlith</div>
+                  <div className="text-sm text-foreground/90 leading-relaxed">
+                    {streamingText ? (
+                      <p className="whitespace-pre-wrap">
+                        {streamingText}
+                        <span className="inline-block w-1.5 h-4 bg-foreground ml-1 align-middle animate-caret">|</span>
+                      </p>
+                    ) : (
+                      <span className="text-xs text-text-muted">Mencari referensi & menghasilkan jawaban...</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1952,25 +1778,24 @@ function ChatPageInner() {
           )}
         </div>
 
-        {/* Floating Command Center Input Dock */}
+        {/* Input Area */}
         <div className="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 shrink-0">
-          <div className="relative rounded-2xl border border-border-strong/90 bg-bg-panel/90 backdrop-blur-xl shadow-2xl shadow-black/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/15 transition-all duration-200 p-3 sm:p-3.5 flex flex-col gap-2.5">
+          <div className="rounded-2xl border border-border-strong bg-bg-panel/90 shadow-xl shadow-black/10 focus-within:border-border-strong transition-all p-3 sm:p-3.5 flex flex-col gap-2.5">
             
-            {/* Top mode indicator chips inside dock */}
+            {/* Mode Switcher Tabs */}
             <div className="flex items-center justify-between gap-2 pb-1 border-b border-border-subtle/40">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 {/* Standard RAG mode tab */}
                 <button
                   type="button"
                   onClick={() => setAgentMode(false)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                     !agentMode
-                      ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30'
-                      : 'text-text-muted hover:text-foreground hover:bg-bg-hover'
+                      ? 'bg-white/10 text-foreground font-semibold'
+                      : 'text-text-muted hover:text-foreground'
                   }`}
                 >
-                  <MessageSquare className="w-3 h-3" />
-                  <span>Chat RAG</span>
+                  Chat
                 </button>
 
                 {/* Agent mode tab */}
@@ -1978,16 +1803,13 @@ function ChatPageInner() {
                   type="button"
                   id="agent-mode-toggle"
                   onClick={() => setAgentMode(a => !a)}
-                  title={agentMode ? 'Mode Agent aktif — klik untuk nonaktifkan' : 'Aktifkan Agent Mode'}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                     agentMode
-                      ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm shadow-violet-500/10'
-                      : 'text-text-muted hover:text-violet-400 hover:bg-bg-hover'
+                      ? 'bg-white/10 text-foreground font-semibold'
+                      : 'text-text-muted hover:text-foreground'
                   }`}
                 >
-                  <Bot className="w-3 h-3" />
-                  <span>Agent Mode</span>
-                  {agentMode && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />}
+                  Agent
                 </button>
 
                 {/* Deep Research button */}
@@ -1995,19 +1817,10 @@ function ChatPageInner() {
                   type="button"
                   id="deep-research-btn"
                   onClick={() => setResearchModalOpen(true)}
-                  title="Deep Research — investigasi mendalam lintas dokumen"
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-emerald-400 hover:bg-emerald-500/5 transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded text-xs font-medium text-text-muted hover:text-foreground transition-all cursor-pointer"
                 >
-                  <FlaskConical className="w-3 h-3" />
-                  <span>Deep Research</span>
-                  {researchRunning && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                  Deep Research
                 </button>
-              </div>
-
-              {/* Grounded Citation Badge */}
-              <div className="hidden sm:flex items-center gap-1 text-[11px] text-text-muted">
-                <Sparkles className="w-3 h-3 text-indigo-400" />
-                <span>Grounded with workspace citations</span>
               </div>
             </div>
 
@@ -2020,8 +1833,8 @@ function ChatPageInner() {
               onKeyDown={handleKeyDown}
               placeholder={
                 agentMode
-                  ? "Perintahkan Agent untuk mencari, menganalisis, atau mengeksekusi multi-langkah..."
-                  : "Tanyakan apa saja seputar dokumen Anda..."
+                  ? "Berikan perintah untuk Agent (misal: analisis dokumen dan rangkum perbedaannya)..."
+                  : "Tanyakan apa saja tentang dokumen Anda..."
               }
               rows={2}
               className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[48px] max-h-[160px]"
@@ -2035,38 +1848,31 @@ function ChatPageInner() {
                   type="button"
                   id="model-selector"
                   onClick={() => setModelMenuOpen(!modelMenuOpen)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong/70 bg-bg-panel/70 hover:border-indigo-500/40 text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
+                  className="px-2.5 py-1 rounded border border-border-strong hover:bg-bg-hover text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span className="truncate max-w-[80px] sm:max-w-[140px] md:max-w-[180px]">
-                    {selectedModel ? selectedModel.name : 'Select Model'}
-                  </span>
-                  <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />
+                  <span>{selectedModel ? selectedModel.name : 'Pilih Model'}</span>
+                  <span className="text-[10px] text-text-muted">▾</span>
                 </button>
 
                 {modelMenuOpen && (
-                  <div className="absolute left-0 bottom-full mb-2 w-72 rounded-2xl border border-border-strong bg-bg-panel/95 backdrop-blur-xl shadow-2xl z-30 overflow-hidden max-h-96 flex flex-col animate-fade-in">
-                    <div className="p-2.5 border-b border-border-strong">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                        <input
-                          type="text"
-                          placeholder="Search models..."
-                          value={modelSearch}
-                          onChange={(e) => setModelSearch(e.target.value)}
-                          className="w-full bg-bg-surface border border-border-strong rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500/50"
-                          autoFocus
-                        />
-                      </div>
+                  <div className="absolute left-0 bottom-full mb-2 w-72 rounded-xl border border-border-strong bg-bg-panel shadow-2xl z-30 overflow-hidden max-h-96 flex flex-col">
+                    <div className="p-2 border-b border-border-strong">
+                      <input
+                        type="text"
+                        placeholder="Cari model..."
+                        value={modelSearch}
+                        onChange={(e) => setModelSearch(e.target.value)}
+                        className="w-full bg-bg-surface border border-border-strong rounded-md px-2.5 py-1.5 text-xs text-foreground placeholder:text-text-muted focus:outline-none"
+                        autoFocus
+                      />
                     </div>
                     
-                    <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-border-strong">
+                    <div className="overflow-y-auto scrollbar-thin">
                       {/* Favorites section */}
                       {favorites.length > 0 && !modelSearch && (
                         <>
-                          <div className="px-3 py-1.5 text-[9px] font-bold text-amber-400 bg-bg-hover flex items-center gap-1">
-                            <Star className="w-3 h-3 fill-amber-400" />
-                            FAVORITE MODELS
+                          <div className="px-3 py-1.5 text-[9px] font-bold text-text-muted bg-bg-hover uppercase tracking-wider">
+                            Favorit
                           </div>
                           {(models.length > 0 ? models : FALLBACK_MODELS)
                             .filter(m => favorites.includes(m.id))
@@ -2084,18 +1890,18 @@ function ChatPageInner() {
                                   }
                                   setModelMenuOpen(false)
                                 }}
-                                className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-indigo-600/10 text-indigo-400' : ''}`}
+                                className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-white/5 font-medium' : ''}`}
                               >
                                 <div className="flex flex-col min-w-0 pr-2">
-                                  <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
-                                  <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
+                                  <span className="text-xs truncate text-foreground">{m.name}</span>
+                                  <span className="text-[8px] text-text-muted uppercase tracking-wider">{m.provider_label}</span>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={(e) => toggleFavorite(m.id, e)}
-                                  className="p-1 text-amber-400 hover:text-text-muted transition-colors shrink-0"
+                                  className="text-xs text-amber-400 hover:text-text-muted transition-colors p-1"
                                 >
-                                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                                  ★
                                 </button>
                               </div>
                             ))}
@@ -2103,8 +1909,8 @@ function ChatPageInner() {
                         </>
                       )}
 
-                      <div className="px-3 py-1.5 text-[9px] font-bold text-text-subtle bg-bg-hover">
-                        {modelSearch ? 'SEARCH RESULTS' : 'ALL AVAILABLE MODELS'}
+                      <div className="px-3 py-1.5 text-[9px] font-bold text-text-muted bg-bg-hover uppercase tracking-wider">
+                        {modelSearch ? 'Hasil Pencarian' : 'Semua Model'}
                       </div>
                       {(models.length > 0 ? models : FALLBACK_MODELS)
                         .filter(m => 
@@ -2126,40 +1932,30 @@ function ChatPageInner() {
                               }
                               setModelMenuOpen(false)
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-indigo-600/10 text-indigo-400' : ''}`}
+                            className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-white/5 font-medium' : ''}`}
                           >
                             <div className="flex flex-col min-w-0 pr-2">
-                              <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
-                              <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
+                              <span className="text-xs truncate text-foreground">{m.name}</span>
+                              <span className="text-[8px] text-text-muted uppercase tracking-wider">{m.provider_label}</span>
                             </div>
                             <button
                               type="button"
                               onClick={(e) => toggleFavorite(m.id, e)}
-                              className="p-1 text-text-muted hover:text-amber-400 transition-colors shrink-0"
+                              className="text-xs text-text-muted hover:text-amber-400 transition-colors p-1"
                             >
-                              <Star className={`w-3.5 h-3.5 ${favorites.includes(m.id) ? 'fill-amber-400 text-amber-400' : ''}`} />
+                              {favorites.includes(m.id) ? '★' : '☆'}
                             </button>
                           </div>
                         ))}
-                        
-                      {(models.length > 0 ? models : FALLBACK_MODELS).filter(m => 
-                          !modelSearch || 
-                          m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
-                          m.provider_label.toLowerCase().includes(modelSearch.toLowerCase())
-                        ).length === 0 && (
-                          <div className="px-3 py-4 text-center text-xs text-text-muted">
-                            No models found matching "{modelSearch}"
-                          </div>
-                      )}
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Right: Keyboard shortcut hint + Send button */}
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span className="text-[10px] text-text-muted hidden md:inline">
-                  <kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border-strong font-sans text-[9px]">⏎</kbd> Kirim · <kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border-strong font-sans text-[9px]">⇧⏎</kbd> Baris baru
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-[10px] text-text-muted hidden sm:inline">
+                  Enter kirim · Shift+Enter baris baru
                 </span>
                 
                 <button
@@ -2167,13 +1963,9 @@ function ChatPageInner() {
                   id="send-message-btn"
                   onClick={() => sendMessage()}
                   disabled={!input.trim() || loading}
-                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-35 disabled:cursor-not-allowed text-white transition-all shadow-md shadow-indigo-500/25 active:scale-95 shrink-0 cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg bg-foreground text-background font-medium text-xs disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-all cursor-pointer"
                 >
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  ) : (
-                    <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
-                  )}
+                  {loading ? 'Memproses...' : 'Kirim'}
                 </button>
               </div>
             </div>
@@ -2188,12 +1980,9 @@ function ChatPageInner() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setHistoryDrawerOpen(false)} />
           <div className="relative z-10 w-72 sm:w-80 h-full bg-background border-r border-border-strong shadow-2xl flex flex-col animate-fade-in">
             <div className="flex items-center justify-between p-4 border-b border-border-subtle">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-indigo-400" />
-                <h2 className="text-sm font-bold text-foreground">Riwayat Percakapan</h2>
-              </div>
-              <button className="p-1 rounded-lg text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors cursor-pointer" onClick={() => setHistoryDrawerOpen(false)}>
-                <X className="w-4 h-4" />
+              <h2 className="text-sm font-semibold text-foreground">Riwayat Percakapan</h2>
+              <button className="text-xs text-text-muted hover:text-foreground p-1 cursor-pointer" onClick={() => setHistoryDrawerOpen(false)}>
+                Tutup
               </button>
             </div>
             <div className="p-3 border-b border-border-subtle">
@@ -2205,12 +1994,12 @@ function ChatPageInner() {
                   setInput('');
                   setHistoryDrawerOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer"
+                className="w-full py-2 rounded-md border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-all cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Percakapan Baru
+                + Percakapan Baru
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 scrollbar-thin">
               {conversations.length === 0 ? (
                 <div className="text-center py-8 text-xs text-text-muted">
                   Belum ada riwayat percakapan.
@@ -2224,17 +2013,14 @@ function ChatPageInner() {
                       selectThread(conv.id);
                       setHistoryDrawerOpen(false);
                     }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl transition-all cursor-pointer group ${
+                    className={`w-full text-left px-3 py-2 rounded-md transition-all cursor-pointer ${
                       activeConversationId === conv.id 
-                        ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30' 
-                        : 'hover:bg-bg-hover text-text-subtle hover:text-foreground border border-transparent'
+                        ? 'bg-white/10 text-foreground font-medium' 
+                        : 'hover:bg-bg-hover text-text-subtle hover:text-foreground'
                     }`}
                   >
-                    <div className="text-xs font-medium line-clamp-2 transition-colors leading-relaxed">{conv.title || 'Percakapan Tanpa Judul'}</div>
-                    <div className="text-[10px] text-text-muted mt-1 flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" />
-                      {formatRelativeTime(conv.updated_at)}
-                    </div>
+                    <div className="text-xs line-clamp-2 leading-relaxed">{conv.title || 'Percakapan Tanpa Judul'}</div>
+                    <div className="text-[10px] text-text-muted mt-0.5">{formatRelativeTime(conv.updated_at)}</div>
                   </button>
                 ))
               )}
@@ -2249,16 +2035,13 @@ function ChatPageInner() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={() => setResearchModalOpen(false)} />
           <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border-strong bg-bg-panel shadow-2xl animate-fade-in overflow-hidden">
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-border-subtle bg-bg-input">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center">
-                <FlaskConical className="w-4.5 h-4.5 text-emerald-400" />
-              </div>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-bg-input">
               <div>
-                <div className="text-sm font-bold text-foreground">Deep Research</div>
-                <div className="text-[10px] text-text-muted">Investigasi mendalam lintas seluruh dokumen workspace</div>
+                <div className="text-sm font-semibold text-foreground">Deep Research</div>
+                <div className="text-xs text-text-muted mt-0.5">Investigasi mendalam lintas seluruh dokumen workspace</div>
               </div>
-              <button onClick={() => setResearchModalOpen(false)} className="ml-auto p-1.5 rounded-lg text-text-muted hover:text-foreground hover:bg-bg-hover transition-all">
-                <X className="w-4 h-4" />
+              <button onClick={() => setResearchModalOpen(false)} className="text-xs text-text-muted hover:text-foreground px-2 py-1 transition-colors">
+                Tutup
               </button>
             </div>
 
@@ -2273,7 +2056,7 @@ function ChatPageInner() {
                 onChange={e => setResearchQuery(e.target.value)}
                 placeholder="Contoh: Analisis lengkap klausul terminasi dan penalti dalam semua kontrak yang ada..."
                 rows={3}
-                className="w-full bg-background border border-border-strong focus:border-emerald-500/50 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed transition-all"
+                className="w-full bg-background border border-border-strong focus:border-border-subtle rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed transition-all"
               />
 
               {/* How it works */}
@@ -2281,17 +2064,15 @@ function ChatPageInner() {
                 <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mb-2">Pipeline Otomatis</div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { step: '1', label: 'Plan', desc: 'Generate 4 sub-questions', color: 'emerald' },
-                    { step: '2', label: 'Search', desc: 'Semantic search per Q', color: 'teal' },
-                    { step: '3', label: 'Synthesize', desc: 'Rangkum per pertanyaan', color: 'cyan' },
-                    { step: '4', label: 'Report', desc: 'Laporan Markdown final', color: 'emerald' },
+                    { step: '1', label: 'Plan', desc: 'Generate 4 sub-questions' },
+                    { step: '2', label: 'Search', desc: 'Semantic search per Q' },
+                    { step: '3', label: 'Synthesize', desc: 'Rangkum per pertanyaan' },
+                    { step: '4', label: 'Report', desc: 'Laporan Markdown final' },
                   ].map(s => (
                     <div key={s.step} className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                        <span className="text-[8px] font-black text-emerald-400">{s.step}</span>
-                      </div>
+                      <span className="text-[10px] font-mono text-text-muted">[{s.step}]</span>
                       <div>
-                        <div className="text-[10px] font-semibold text-foreground">{s.label}</div>
+                        <div className="text-[10px] font-medium text-foreground">{s.label}</div>
                         <div className="text-[9px] text-text-muted">{s.desc}</div>
                       </div>
                     </div>
@@ -2311,7 +2092,7 @@ function ChatPageInner() {
                     <button
                       key={s}
                       onClick={() => setResearchQuery(s)}
-                      className="text-[10px] px-2.5 py-1 rounded-lg bg-bg-hover hover:bg-emerald-500/10 hover:border-emerald-500/20 border border-border-strong text-text-subtle hover:text-emerald-400 transition-all"
+                      className="text-[10px] px-2.5 py-1 rounded border border-border-subtle hover:bg-bg-hover text-text-subtle hover:text-foreground transition-all"
                     >
                       {s}
                     </button>
@@ -2324,7 +2105,7 @@ function ChatPageInner() {
             <div className="px-5 pb-5 flex gap-3">
               <button
                 onClick={() => setResearchModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-border-strong text-sm text-text-subtle hover:text-foreground hover:bg-bg-hover transition-all"
+                className="flex-1 py-2.5 rounded-xl border border-border-strong text-xs text-text-subtle hover:text-foreground hover:bg-bg-hover transition-all"
               >
                 Batal
               </button>
@@ -2335,9 +2116,8 @@ function ChatPageInner() {
                   startDeepResearch(researchQuery)
                 }}
                 disabled={!researchQuery.trim() || researchRunning}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+                className="flex-1 py-2.5 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium transition-all"
               >
-                <FlaskConical className="w-3.5 h-3.5" />
                 Mulai Riset
               </button>
             </div>
@@ -2366,41 +2146,38 @@ function ChatPageInner() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border-subtle bg-bg-input">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
-                <span className="text-xs font-bold text-foreground truncate max-w-[100px] sm:max-w-md">{viewerDoc.name}</span>
-                <span className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded shrink-0">p. {viewerDoc.page}</span>
+                <span className="text-xs font-semibold text-foreground truncate max-w-[150px] sm:max-w-md">{viewerDoc.name}</span>
+                <span className="text-[11px] font-mono text-text-muted border border-border-subtle px-1.5 py-0.5 rounded">p. {viewerDoc.page}</span>
                 <a
                   href={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded bg-[#2A2A3A] border border-border-subtle hover:border-indigo-500/40 hover:bg-indigo-600/5 text-[10px] text-indigo-400 hover:text-indigo-300 transition-all font-semibold shrink-0"
+                  className="inline-flex items-center px-2 py-1 rounded border border-border-subtle hover:bg-bg-hover text-xs text-text-muted hover:text-foreground transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" />
-                  <span className="hidden sm:inline">Buka di Tab Baru</span>
+                  <span className="hidden sm:inline">Buka Tab Baru</span>
+                  <span className="sm:hidden">Tab Baru</span>
                 </a>
               </div>
-              <button onClick={() => setViewerOpen(false)} className="p-1 rounded text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors shrink-0">
-                <X className="w-4 h-4" />
+              <button onClick={() => setViewerOpen(false)} className="text-xs text-text-muted hover:text-foreground px-2 py-1 rounded transition-colors">
+                Tutup
               </button>
             </div>
 
             {/* Viewer toolbar */}
-            <div className="flex items-center gap-4 px-4 py-2 border-b border-border-subtle bg-background text-[10px] text-text-subtle">
+            <div className="flex items-center gap-4 px-4 py-2 border-b border-border-subtle bg-background text-xs text-text-subtle">
               <div className="flex items-center gap-2">
-                <span>Page</span>
-                <input type="text" readOnly value={viewerDoc.page} className="w-8 text-center bg-bg-hover border border-border-strong rounded py-0.5" />
+                <span>Halaman</span>
+                <input type="text" readOnly value={viewerDoc.page} className="w-8 text-center bg-bg-hover border border-border-subtle rounded py-0.5 text-xs text-foreground" />
               </div>
-              <div className="w-px h-3 bg-[#2A2A3A]" />
+              <div className="w-px h-3 bg-border-subtle" />
               <button
                 onClick={() => {
-                  setInput(`Tell me more about the section on page ${viewerDoc.page} regarding "${viewerDoc.snippet.slice(0, 35)}..."`)
+                  setInput(`Jelaskan lebih lanjut bagian pada halaman ${viewerDoc.page} mengenai: "${viewerDoc.snippet.slice(0, 50)}..."`)
                   setViewerOpen(false)
                 }}
-                className="ml-auto flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors active:scale-95 text-[9px] sm:text-[10px]"
+                className="ml-auto px-3 py-1 rounded border border-border-subtle hover:bg-bg-hover text-foreground font-medium text-xs transition-colors"
               >
-                <Brain className="w-3 h-3" />
-                <span className="hidden sm:inline">Ask AI about this page</span>
-                <span className="sm:hidden">Tanya AI</span>
+                Tanya AI tentang bagian ini
               </button>
             </div>
 
@@ -2409,8 +2186,8 @@ function ChatPageInner() {
               {viewerDoc.name.toLowerCase().endsWith('.pdf') ? (
                 <div className="flex-1 w-full flex flex-col">
                   {/* Mobile Tip Banner */}
-                  <div className="block sm:hidden bg-indigo-500/10 border-b border-indigo-500/20 px-4 py-2 text-[10px] text-indigo-300 text-center">
-                    💡 Tips: Jika PDF tidak tampil sempurna, gunakan tombol <strong>"Buka di Tab Baru"</strong> di atas.
+                  <div className="block sm:hidden border-b border-border-subtle px-4 py-2 text-[11px] text-text-muted text-center">
+                    Catatan: Gunakan <strong>"Buka Tab Baru"</strong> jika pratinjau dokumen tidak memuat di peramban seluler.
                   </div>
                   <iframe
                     src={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
