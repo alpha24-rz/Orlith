@@ -14,19 +14,42 @@ import {
   MessageSquare, ChevronRight, Info, Search, Star,
   Bot, Wrench, CheckCircle2, AlertCircle, Loader2, ChevronUp, Database,
   FlaskConical, BookOpen, ListTree, Layers, Download, ExternalLink, ScrollText, Trash2, Check,
-  Pencil, RefreshCw
+  Pencil, RefreshCw, Code, ArrowUp, GitCompare, Compass, Plus, History, ArrowUpRight
 } from 'lucide-react'
 import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 
-const SUGGESTED_QUERIES = [
-  "What are the termination clauses?",
-  "Summarize the key financial obligations",
-  "Who are the parties in this agreement?",
-  "What is the total contract value?",
-  "Extract all payment due dates",
+const PROMPT_SUGGESTIONS = [
+  {
+    icon: FileText,
+    color: 'from-blue-500/20 to-indigo-500/20 text-indigo-400 border-indigo-500/30',
+    title: 'Ringkasan Eksekutif',
+    desc: 'Rangkum poin-poin utama, tujuan, dan kesimpulan dari dokumen.',
+    query: 'Buatkan ringkasan eksekutif dan poin-poin penting dari dokumen yang ada.',
+  },
+  {
+    icon: Search,
+    color: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
+    title: 'Temukan Fakta & Data Kunci',
+    desc: 'Cari tanggal krusial, nilai finansial, dan pihak yang terlibat.',
+    query: 'Ekstrak semua tanggal penting, angka finansial, dan pihak yang disebutkan dalam dokumen.',
+  },
+  {
+    icon: GitCompare,
+    color: 'from-violet-500/20 to-purple-500/20 text-violet-400 border-violet-500/30',
+    title: 'Analisis & Perbandingan',
+    desc: 'Bandingkan pasal, kewajiban, atau perubahan antar bagian dokumen.',
+    query: 'Bandingkan kewajiban, hak, dan perbedaan ketentuan utama dalam dokumen ini.',
+  },
+  {
+    icon: Sparkles,
+    color: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30',
+    title: 'Identifikasi Risiko & Rekomendasi',
+    desc: 'Deteksi potensi klausul berisiko dan rekomendasi mitigasi.',
+    query: 'Identifikasi potensi risiko atau klausul kritis dalam dokumen ini dan berikan rekomendasi strategi.',
+  },
 ]
 
 interface ModelInfo {
@@ -368,6 +391,46 @@ function processCitationsInNode(
 }
 
 
+// ─── Standalone CodeBlock Component ──────────────────────────────────────────
+function CodeBlock({ language, codeString, props }: { language: string; codeString: string; props: any }) {
+  const [isCopied, setIsCopied] = useState(false)
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(codeString)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }
+
+  return (
+    <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#121316] shadow-md shadow-black/20">
+      <div className="flex items-center justify-between px-4 py-2 bg-black/60 border-b border-border-subtle/50 text-[11px] font-mono text-text-muted">
+        <span className="flex items-center gap-1.5 uppercase font-semibold tracking-wider text-indigo-300">
+          <Code className="w-3.5 h-3.5 text-indigo-400" />
+          {language || 'code'}
+        </span>
+        <button
+          onClick={handleCopyCode}
+          className="flex items-center gap-1.5 text-xs text-text-subtle hover:text-foreground transition-colors px-2 py-0.5 rounded-md hover:bg-white/10 cursor-pointer"
+          title={isCopied ? "Tersalin!" : "Salin kode"}
+        >
+          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          <span className="text-[11px] font-medium">{isCopied ? 'Tersalin' : 'Salin'}</span>
+        </button>
+      </div>
+      <div className="text-[13px] overflow-x-auto leading-relaxed">
+        <SyntaxHighlighter
+          {...props}
+          style={vscDarkPlus}
+          language={language || 'text'}
+          PreTag="div"
+          customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
+        >
+          {codeString}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  )
+}
+
 interface ChatBubbleProps {
   message: ChatMessage
   onOpenDoc: (citation: Citation) => void
@@ -420,8 +483,8 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   if (isUser) {
     if (isEditing) {
       return (
-        <div className="flex justify-end mb-4 animate-fade-in w-full">
-          <div className="w-full max-w-lg bg-bg-input border border-indigo-500/30 rounded-2xl p-4">
+        <div className="flex justify-end mb-6 animate-fade-in w-full">
+          <div className="w-full max-w-xl bg-bg-input border border-indigo-500/40 rounded-2xl p-4 shadow-lg shadow-black/20">
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
@@ -434,7 +497,7 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
                   setIsEditing(false)
                   setEditContent(message.content)
                 }}
-                className="px-3 py-1.5 rounded-lg border border-border-strong text-xs font-semibold text-text-subtle hover:text-foreground hover:bg-bg-hover transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-border-strong text-xs font-semibold text-text-subtle hover:text-foreground hover:bg-bg-hover transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -445,7 +508,7 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
                   }
                   setIsEditing(false)
                 }}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors cursor-pointer shadow-sm"
               >
                 Simpan & Kirim
               </button>
@@ -456,23 +519,24 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
     }
 
     return (
-      <div className="flex flex-col items-end mb-4 animate-fade-in group">
-        <div className="max-w-lg bg-indigo-600/20 border border-indigo-500/20 rounded-2xl rounded-tr-sm px-4 py-3">
+      <div className="flex flex-col items-end mb-6 animate-fade-in group">
+        <div className="max-w-xl bg-gradient-to-r from-indigo-600/15 to-violet-600/15 border border-indigo-500/25 rounded-2xl rounded-tr-sm px-4.5 py-3.5 shadow-sm shadow-indigo-500/5">
           <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
-        <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[10px] text-text-muted mr-1">{formatRelativeTime(message.timestamp)}</span>
           <button
             onClick={copy}
-            className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
-            title={copied ? 'Disalin!' : 'Salin'}
+            className="p-1 rounded-md hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
+            title={copied ? 'Disalin!' : 'Salin pertanyaan'}
           >
             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
           </button>
           {onEditSubmit && (
             <button
               onClick={() => setIsEditing(true)}
-              className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
-              title="Edit pesan"
+              className="p-1 rounded-md hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
+              title="Edit pertanyaan"
             >
               <Pencil className="w-3 h-3" />
             </button>
@@ -486,14 +550,13 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   const hasInlineCitations = citations.length > 0 && /\[\d+(?:,\s*\d+)*\]/.test(message.content)
 
   const renderers: Components = {
-    // Custom renderer untuk paragraf — inject citation badges
     p: ({ children }) => (
-      <p className="mb-3 last:mb-0">
+      <p className="mb-3.5 last:mb-0 leading-relaxed">
         {processCitationsInNode(children, citations, handleCitationClick)}
       </p>
     ),
     li: ({ children }) => (
-      <li className="mb-1">
+      <li className="mb-1.5 leading-relaxed">
         {processCitationsInNode(children, citations, handleCitationClick)}
       </li>
     ),
@@ -507,43 +570,11 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
       const language = match ? match[1] : ''
       const codeString = String(children).replace(/\n$/, '')
       
-      const [isCopied, setIsCopied] = useState(false)
-      const handleCopyCode = () => {
-        navigator.clipboard.writeText(codeString)
-        setIsCopied(true)
-        setTimeout(() => setIsCopied(false), 2000)
-      }
-
       if (!inline && match) {
-        return (
-          <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#1E1E1E]">
-            <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-border-strong text-[10px] uppercase font-bold text-text-muted">
-              <span>{language}</span>
-              <button
-                onClick={handleCopyCode}
-                className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-                title={isCopied ? "Copied!" : "Copy code"}
-              >
-                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {isCopied ? <span className="text-emerald-400 normal-case">Copied</span> : <span className="normal-case">Copy</span>}
-              </button>
-            </div>
-            <div className="text-[13px]">
-              <SyntaxHighlighter
-                {...props}
-                style={vscDarkPlus}
-                language={language}
-                PreTag="div"
-                customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
-              >
-                {codeString}
-              </SyntaxHighlighter>
-            </div>
-          </div>
-        )
+        return <CodeBlock language={language} codeString={codeString} props={props} />
       }
       return (
-        <code {...props} className={`${className} bg-bg-hover px-1.5 py-0.5 rounded text-indigo-300 font-mono text-[13px]`}>
+        <code {...props} className={`${className || ''} bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20 font-mono text-[12px]`}>
           {children}
         </code>
       )
@@ -551,12 +582,16 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   }
 
   return (
-    <div className="flex gap-3 mb-6 animate-fade-in">
-      <div className="flex-1 max-w-2xl">
-        <div className="bg-bg-input border border-border-strong rounded-2xl rounded-tl-sm px-4 py-3 mb-2">
+    <div className="flex gap-3.5 mb-8 animate-fade-in group">
+      {/* AI Avatar */}
+      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600/30 to-violet-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-indigo-500/10">
+        <Brain className="w-4 h-4 text-indigo-400" />
+      </div>
+
+      <div className="flex-1 max-w-3xl lg:max-w-4xl min-w-0">
+        <div className="bg-bg-input/60 border border-border-strong/80 rounded-2xl rounded-tl-sm px-5 py-4 mb-2.5 shadow-sm shadow-black/10 backdrop-blur-sm">
           {hasInlineCitations ? (
-            // Render teks dengan inline citation badges yang interaktif
-            <div className="text-sm text-foreground/80 leading-relaxed">
+            <div className="text-sm text-foreground/90 leading-relaxed">
               <div className="prose prose-invert prose-sm max-w-none
                 [&_strong]:text-foreground [&_strong]:font-semibold
                 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
@@ -574,8 +609,7 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
               </div>
             </div>
           ) : (
-            // Render normal tanpa inline citations
-            <div className="prose prose-invert prose-sm max-w-none text-foreground/80 leading-relaxed
+            <div className="prose prose-invert prose-sm max-w-none text-foreground/90 leading-relaxed
               [&_strong]:text-foreground [&_strong]:font-semibold
               [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
               [&_th]:px-4 [&_th]:py-3 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
@@ -595,105 +629,101 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
 
         {/* Active citation detail panel */}
         {activeCitation && (
-          <div ref={citationPanelRef} className="mb-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 animate-fade-in">
+          <div ref={citationPanelRef} className="mb-3 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-3.5 animate-fade-in shadow-lg">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-3.5 h-3.5 text-indigo-400" />
                 <span className="text-xs font-semibold text-foreground">{activeCitation.docName}</span>
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded">p.{activeCitation.page}</span>
+                <span className="text-[10px] bg-indigo-500/15 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">p.{activeCitation.page}</span>
                 {activeCitation.relevanceScore && (
-                  <span className="text-[10px] text-emerald-400">{Math.round(activeCitation.relevanceScore * 100)}% match</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">{Math.round(activeCitation.relevanceScore * 100)}% match</span>
                 )}
               </div>
-              <button onClick={() => setActiveCitation(null)} className="text-text-muted hover:text-foreground transition-colors">
-                <X className="w-3 h-3" />
+              <button onClick={() => setActiveCitation(null)} className="text-text-muted hover:text-foreground transition-colors p-1 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[11px] text-text-subtle italic leading-relaxed">
+            <p className="text-[12px] text-text-subtle italic leading-relaxed">
               &ldquo;{activeCitation.fullText || activeCitation.snippet}&rdquo;
             </p>
             <button
               onClick={() => { onOpenDoc(activeCitation); setActiveCitation(null); }}
-              className="mt-2 text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+              className="mt-2.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
             >
-              Buka dokumen <ChevronRight className="w-3 h-3" />
+              Buka dokumen di viewer <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
-        {/* Citations pills + confidence */}
+        {/* Citations pills + source tags */}
         {citations.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2.5">
+            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider mr-0.5">Sumber:</span>
             {citations.map((c, i) => (
               <CitationPill key={i} citation={c} index={i} onOpenDoc={() => onOpenDoc(c)} />
             ))}
             {message.source_mode && message.source_mode === 'DOCUMENT' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
                 <CheckCircle2 className="w-3 h-3" />
-                Answered from document
+                Dokumen Terverifikasi
               </span>
             )}
             {message.source_mode && message.source_mode === 'HYBRID' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border bg-indigo-500/10 border-indigo-500/20 text-indigo-400">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-indigo-500/10 border-indigo-500/20 text-indigo-400">
                 <Layers className="w-3 h-3" />
-                Document + General Knowledge
+                Dokumen + Pengetahuan Umum
               </span>
             )}
             {message.source_mode && message.source_mode === 'GENERAL' && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border bg-amber-500/10 border-amber-500/20 text-amber-400" title="No relevant document found">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border bg-amber-500/10 border-amber-500/20 text-amber-400" title="Tidak ditemukan dokumen relevan">
                 <AlertCircle className="w-3 h-3" />
-                General knowledge
+                Pengetahuan Umum
               </span>
             )}
             {message.retrieval_score && message.retrieval_score > 0 && (
-              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${message.retrieval_score > 0.7 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${message.retrieval_score > 0.7 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                 message.retrieval_score > 0.45 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
                   'bg-red-500/10 border-red-500/20 text-red-400'
                 }`} title="Similarity Score">
-                <Search className="w-3 h-3" />
-                {Math.round(message.retrieval_score * 100)}% Match
-              </span>
-            )}
-            {/* Query rewriting badge */}
-            {message.queriesUsed && message.queriesUsed > 1 && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-violet-500/10 border border-violet-500/20 text-violet-400">
                 <Search className="w-2.5 h-2.5" />
-                {message.queriesUsed} query variants
+                {Math.round(message.retrieval_score * 100)}% Match
               </span>
             )}
           </div>
         )}
 
-        {/* Meta bar */}
-        <div className="flex items-center gap-3">
+        {/* Meta Bar */}
+        <div className="flex items-center gap-3 text-text-muted">
           {message.model && (
-            <span className="text-[10px] text-text-muted">{message.model}</span>
+            <span className="text-[11px] px-2 py-0.5 rounded bg-white/5 border border-white/5 font-mono">{message.model}</span>
           )}
-          <span className="text-[10px] text-text-muted">{formatRelativeTime(message.timestamp)}</span>
-          <div className="flex items-center gap-1 ml-auto">
-            <button onClick={copy} className="p-1 rounded text-text-muted hover:text-foreground transition-colors" title={copied ? 'Disalin!' : 'Salin'}>
-              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          <span className="text-[11px]">{formatRelativeTime(message.timestamp)}</span>
+          <div className="flex items-center gap-1 ml-auto opacity-70 group-hover:opacity-100 transition-opacity">
+            <button onClick={copy} className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer" title={copied ? 'Disalin!' : 'Salin respons'}>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
             {onRegenerate && (
               <button
                 onClick={() => onRegenerate(message.id)}
-                className="p-1 rounded text-text-muted hover:text-foreground transition-colors"
+                className="p-1.5 rounded-lg hover:bg-white/5 text-text-muted hover:text-foreground transition-colors cursor-pointer"
                 title="Regenerasi respon"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
             )}
             <button
               onClick={() => setFeedback('up')}
-              className={`p-1 rounded transition-colors ${feedback === 'up' ? 'text-emerald-400' : 'text-text-muted hover:text-foreground'}`}
+              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'up' ? 'text-emerald-400' : 'text-text-muted hover:text-foreground'}`}
+              title="Bagus"
             >
-              <ThumbsUp className="w-3 h-3" />
+              <ThumbsUp className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setFeedback('down')}
-              className={`p-1 rounded transition-colors ${feedback === 'down' ? 'text-red-400' : 'text-text-muted hover:text-foreground'}`}
+              className={`p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'down' ? 'text-red-400' : 'text-text-muted hover:text-foreground'}`}
+              title="Kurang relevan"
             >
-              <ThumbsDown className="w-3 h-3" />
+              <ThumbsDown className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -1745,40 +1775,122 @@ function ChatPageInner() {
   }
 
   return (
-    <div className="flex h-full animate-fade-in relative">
+    <div className="flex h-full animate-fade-in relative overflow-hidden">
       {/* Main chat */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background">
-        {/* Messages */}
+      <div className="flex-1 flex flex-col min-w-0 bg-background h-full">
+        {/* Top Context Header Bar */}
+        <div className="h-14 border-b border-border-subtle/80 bg-background/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between shrink-0 z-10">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Toggle History Button */}
+            <button
+              onClick={() => setHistoryDrawerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-subtle bg-bg-panel hover:bg-bg-hover hover:border-border-strong text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
+              title="Lihat riwayat percakapan"
+            >
+              <History className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="hidden sm:inline">Riwayat</span>
+              {conversations.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/15 text-indigo-400 font-bold leading-none">
+                  {conversations.length}
+                </span>
+              )}
+            </button>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col scrollbar-none">
+            <div className="h-4 w-px bg-border-strong hidden sm:block" />
+
+            {/* Active Conversation Title */}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold text-foreground truncate max-w-[140px] sm:max-w-[240px] md:max-w-md">
+                {activeConversationId
+                  ? conversations.find(c => c.id === activeConversationId)?.title || 'Percakapan Aktif'
+                  : 'Percakapan Baru'}
+              </span>
+            </div>
+
+            {/* Active Workspace Badge */}
+            {activeWorkspace && (
+              <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 truncate max-w-[160px]">
+                <Database className="w-3 h-3 text-indigo-400 shrink-0" />
+                <span className="truncate">{activeWorkspace.name}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* New Conversation Button */}
+            <button
+              onClick={() => {
+                router.push('/dashboard/chat')
+                setActiveConversationId(null)
+                setMessages([])
+                setInput('')
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 text-xs font-medium transition-all cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Messages scroll area */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 flex flex-col scrollbar-none">
           {loadingThread && messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-text-muted animate-pulse">
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-text-muted animate-pulse">
               <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
               <span className="text-xs font-semibold tracking-wide">Memuat percakapan...</span>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-6 py-12">
-              {/* <img src="/logo_dark.svg" alt="" className='w-12 h-12' /> */}
-
-              <div>
-                <h2 className="text-xl font-black mb-2">Ask anything about your documents</h2>
-                <p className="text-sm text-text-subtle max-w-sm">I'll search across all documents in your workspace and return cited answers.</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 max-w-3xl mx-auto w-full animate-fade-in">
+              {/* Glowing Brand Emblem */}
+              <div className="relative mb-6">
+                <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-pink-500/20 blur-xl opacity-70 animate-pulse" />
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-b from-bg-panel to-bg-input border border-indigo-500/30 shadow-2xl flex items-center justify-center">
+                  <Brain className="w-8 h-8 text-indigo-400" />
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
-                {SUGGESTED_QUERIES.map((q, i) => (
-                  <button
-                    key={i}
-                    id={`suggested-query-${i}`}
-                    onClick={() => setInput(q)}
-                    className="p-3 rounded-xl border border-border-strong hover:border-indigo-500/30 hover:bg-indigo-600/5 text-left text-xs text-text-subtle hover:text-foreground transition-all duration-200"
-                  >
-                    {q}
-                  </button>
-                ))}
+
+              {/* Title & Subtitle */}
+              <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">
+                What can I help you analyze today?
+              </h2>
+              <p className="text-sm text-text-subtle max-w-md mb-8 leading-relaxed">
+                Tanyakan apa saja seputar dokumen Anda. Orlith akan mencari, menganalisis, dan memberikan jawaban dengan sitasi yang terverifikasi.
+              </p>
+
+              {/* Bento Prompt Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full text-left">
+                {PROMPT_SUGGESTIONS.map((item, i) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={i}
+                      id={`suggested-query-${i}`}
+                      onClick={() => {
+                        setInput(item.query)
+                        inputRef.current?.focus()
+                      }}
+                      className="group relative flex items-start gap-3.5 p-4 rounded-2xl border border-border-strong/80 bg-bg-panel/60 hover:bg-bg-hover hover:border-indigo-500/40 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/5 text-left cursor-pointer"
+                    >
+                      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${item.color} border flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform`}>
+                        <Icon className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-foreground group-hover:text-indigo-400 transition-colors flex items-center justify-between">
+                          <span>{item.title}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400" />
+                        </div>
+                        <div className="text-[11px] text-text-subtle mt-1 line-clamp-2 leading-relaxed">
+                          {item.desc}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col">
+            <div className="w-full max-w-4xl mx-auto flex flex-col space-y-6">
               {messages.map(m => (
                 <ChatBubble
                   key={m.id}
@@ -1810,25 +1922,25 @@ function ChatPageInner() {
               )}
               {/* Regular streaming indicator */}
               {loading && !agentMode && (
-                <div className="flex gap-3 mb-6">
-                  <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Brain className="w-4 h-4 text-foreground" />
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-indigo-500/10 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/10">
+                    <Brain className="w-4 h-4 text-indigo-400 animate-pulse" />
                   </div>
-                  <div className="flex-1 max-w-2xl">
-                    <div className="bg-bg-input border border-border-strong rounded-2xl rounded-tl-sm px-4 py-3">
+                  <div className="flex-1 max-w-3xl">
+                    <div className="bg-bg-panel/80 border border-border-strong/80 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm">
                       {streamingText ? (
-                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                        <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                           {streamingText}
                           <span className="inline-block w-1.5 h-4 bg-indigo-500 ml-1.5 align-middle animate-caret">|</span>
                         </p>
                       ) : (
-                        <div className="flex items-center gap-2 text-text-muted">
-                          <div className="flex gap-1">
-                            {[0, 1, 2].map(i => (
-                              <div key={i} className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                            ))}
+                        <div className="flex items-center gap-3 text-text-muted py-1">
+                          <div className="flex gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 rounded-full bg-indigo-300 animate-bounce" style={{ animationDelay: '300ms' }} />
                           </div>
-                          <span className="text-xs">Searching documents…</span>
+                          <span className="text-xs font-medium text-text-subtle">Mencari referensi & menghasilkan jawaban...</span>
                         </div>
                       )}
                     </div>
@@ -1840,230 +1952,292 @@ function ChatPageInner() {
           )}
         </div>
 
-        {/* Input area */}
-        <div className="p-3 sm:p-4 border-t border-border-subtle shrink-0 bg-background flex flex-col gap-2 sm:gap-3">
+        {/* Floating Command Center Input Dock */}
+        <div className="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 shrink-0">
+          <div className="relative rounded-2xl border border-border-strong/90 bg-bg-panel/90 backdrop-blur-xl shadow-2xl shadow-black/30 focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/15 transition-all duration-200 p-3 sm:p-3.5 flex flex-col gap-2.5">
+            
+            {/* Top mode indicator chips inside dock */}
+            <div className="flex items-center justify-between gap-2 pb-1 border-b border-border-subtle/40">
+              <div className="flex items-center gap-1.5">
+                {/* Standard RAG mode tab */}
+                <button
+                  type="button"
+                  onClick={() => setAgentMode(false)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    !agentMode
+                      ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30'
+                      : 'text-text-muted hover:text-foreground hover:bg-bg-hover'
+                  }`}
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  <span>Chat RAG</span>
+                </button>
 
+                {/* Agent mode tab */}
+                <button
+                  type="button"
+                  id="agent-mode-toggle"
+                  onClick={() => setAgentMode(a => !a)}
+                  title={agentMode ? 'Mode Agent aktif — klik untuk nonaktifkan' : 'Aktifkan Agent Mode'}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    agentMode
+                      ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm shadow-violet-500/10'
+                      : 'text-text-muted hover:text-violet-400 hover:bg-bg-hover'
+                  }`}
+                >
+                  <Bot className="w-3 h-3" />
+                  <span>Agent Mode</span>
+                  {agentMode && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />}
+                </button>
 
-          <div className="flex flex-col gap-2 rounded-2xl border border-border-strong bg-bg-input backdrop-blur-md focus-within:border-indigo-500/50 focus-within:shadow-lg focus-within:shadow-indigo-500/5 transition-all duration-200 p-2.5 sm:p-3">
+                {/* Deep Research button */}
+                <button
+                  type="button"
+                  id="deep-research-btn"
+                  onClick={() => setResearchModalOpen(true)}
+                  title="Deep Research — investigasi mendalam lintas dokumen"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-emerald-400 hover:bg-emerald-500/5 transition-all cursor-pointer"
+                >
+                  <FlaskConical className="w-3 h-3" />
+                  <span>Deep Research</span>
+                  {researchRunning && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                </button>
+              </div>
+
+              {/* Grounded Citation Badge */}
+              <div className="hidden sm:flex items-center gap-1 text-[11px] text-text-muted">
+                <Sparkles className="w-3 h-3 text-indigo-400" />
+                <span>Grounded with workspace citations</span>
+              </div>
+            </div>
+
+            {/* Textarea */}
             <textarea
               ref={inputRef}
               id="chat-input"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything about your documents…"
+              placeholder={
+                agentMode
+                  ? "Perintahkan Agent untuk mencari, menganalisis, atau mengeksekusi multi-langkah..."
+                  : "Tanyakan apa saja seputar dokumen Anda..."
+              }
               rows={2}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[44px] max-h-[160px]"
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[48px] max-h-[160px]"
             />
-            <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
-              {/* Model picker + Agent Mode toggle + Research button */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {/* Deep Research button */}
+
+            {/* Bottom bar inside dock */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle/40">
+              {/* Model Picker */}
+              <div className="relative">
                 <button
-                  id="deep-research-btn"
-                  onClick={() => setResearchModalOpen(true)}
-                  title="Deep Research — riset mendalam lintas dokumen"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-emerald-500/30 hover:bg-emerald-500/5 text-xs font-medium text-text-subtle hover:text-emerald-400 transition-all cursor-pointer"
+                  type="button"
+                  id="model-selector"
+                  onClick={() => setModelMenuOpen(!modelMenuOpen)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong/70 bg-bg-panel/70 hover:border-indigo-500/40 text-xs font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
                 >
-                  <FlaskConical className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden md:inline">Research</span>
-                  {researchRunning && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span className="truncate max-w-[80px] sm:max-w-[140px] md:max-w-[180px]">
+                    {selectedModel ? selectedModel.name : 'Select Model'}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />
                 </button>
 
-                {/* Agent Mode toggle */}
-                <button
-                  id="agent-mode-toggle"
-                  onClick={() => setAgentMode(a => !a)}
-                  title={agentMode ? 'Mode Agent aktif — klik untuk nonaktifkan' : 'Aktifkan Agent Mode'}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${agentMode
-                    ? 'bg-violet-600/20 border-violet-500/40 text-violet-300 shadow-sm shadow-violet-500/10'
-                    : 'border-border-strong bg-bg-panel hover:border-violet-500/30 text-text-subtle hover:text-violet-400'
-                    }`}
-                >
-                  <Bot className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden md:inline">Agent</span>
-                  {agentMode && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse shrink-0" />}
-                </button>
-
-                {/* Model picker */}
-                <div className="relative">
-                  <button
-                    id="model-selector"
-                    onClick={() => setModelMenuOpen(!modelMenuOpen)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border-strong bg-bg-panel hover:border-border-strong text-xs font-medium transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span className="truncate max-w-[70px] sm:max-w-[120px] md:max-w-[150px]">
-                      {selectedModel ? selectedModel.name : 'Select Model'}
-                    </span>
-                    <ChevronDown className="w-3 h-3 text-text-muted shrink-0" />
-                  </button>
-                  {modelMenuOpen && (
-                    <div className="absolute left-0 bottom-full mb-1 w-64 rounded-xl border border-border-strong bg-bg-input shadow-xl z-20 overflow-hidden max-h-96 flex flex-col">
-                      <div className="p-2 border-b border-border-strong">
-                        <div className="relative">
-                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                          <input
-                            type="text"
-                            placeholder="Search models..."
-                            value={modelSearch}
-                            onChange={(e) => setModelSearch(e.target.value)}
-                            className="w-full bg-bg-surface border border-border-strong rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500/50"
-                            autoFocus
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-border-strong">
-                        {/* Favorites section */}
-                        {favorites.length > 0 && !modelSearch && (
-                          <>
-                            <div className="px-3 py-1.5 text-[9px] font-bold text-amber-400 bg-bg-hover flex items-center gap-1">
-                              <Star className="w-3 h-3 fill-amber-400" />
-                              FAVORITE MODELS
-                            </div>
-                            {(models.length > 0 ? models : FALLBACK_MODELS)
-                              .filter(m => favorites.includes(m.id))
-                              .map(m => (
-                                <div
-                                  key={`fav-${m.id}`}
-                                  onClick={() => {
-                                    setSelectedModel(m)
-                                    localStorage.setItem('documind_preferred_model', m.id)
-                                    if (activeWorkspace) {
-                                      updateAiSettings(activeWorkspace.id, {
-                                        default_chat_endpoint_id: m.endpoint_id,
-                                        default_chat_model: m.id,
-                                      }).catch(console.error)
-                                    }
-                                    setModelMenuOpen(false)
-                                  }}
-                                  className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-bg-hover' : ''}`}
-                                >
-                                  <div className="flex flex-col min-w-0 pr-2">
-                                    <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
-                                    <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
-                                  </div>
-                                  <button
-                                    onClick={(e) => toggleFavorite(m.id, e)}
-                                    className="p-1 text-amber-400 hover:text-text-muted transition-colors shrink-0"
-                                  >
-                                    <Star className="w-3.5 h-3.5 fill-amber-400" />
-                                  </button>
-                                </div>
-                              ))}
-                            <div className="border-t border-border-strong" />
-                          </>
-                        )}
-
-                        <div className="px-3 py-1.5 text-[9px] font-bold text-text-subtle bg-bg-hover">
-                          {modelSearch ? 'SEARCH RESULTS' : 'ALL AVAILABLE MODELS'}
-                        </div>
-                        {(models.length > 0 ? models : FALLBACK_MODELS)
-                          .filter(m => 
-                            !modelSearch || 
-                            m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
-                            m.provider_label.toLowerCase().includes(modelSearch.toLowerCase())
-                          )
-                          .map(m => (
-                            <div
-                              key={m.id}
-                              onClick={() => {
-                                setSelectedModel(m)
-                                localStorage.setItem('documind_preferred_model', m.id)
-                                if (activeWorkspace) {
-                                  updateAiSettings(activeWorkspace.id, {
-                                    default_chat_endpoint_id: m.endpoint_id,
-                                    default_chat_model: m.id,
-                                  }).catch(console.error)
-                                }
-                                setModelMenuOpen(false)
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-bg-hover' : ''}`}
-                            >
-                              <div className="flex flex-col min-w-0 pr-2">
-                                <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
-                                <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
-                              </div>
-                              <button
-                                onClick={(e) => toggleFavorite(m.id, e)}
-                                className="p-1 text-text-muted hover:text-amber-400 transition-colors shrink-0"
-                              >
-                                <Star className={`w-3.5 h-3.5 ${favorites.includes(m.id) ? 'fill-amber-400 text-amber-400' : ''}`} />
-                              </button>
-                            </div>
-                          ))}
-                          
-                        {(models.length > 0 ? models : FALLBACK_MODELS).filter(m => 
-                            !modelSearch || 
-                            m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
-                            m.provider_label.toLowerCase().includes(modelSearch.toLowerCase())
-                          ).length === 0 && (
-                            <div className="px-3 py-4 text-center text-xs text-text-muted">
-                              No models found matching "{modelSearch}"
-                            </div>
-                        )}
+                {modelMenuOpen && (
+                  <div className="absolute left-0 bottom-full mb-2 w-72 rounded-2xl border border-border-strong bg-bg-panel/95 backdrop-blur-xl shadow-2xl z-30 overflow-hidden max-h-96 flex flex-col animate-fade-in">
+                    <div className="p-2.5 border-b border-border-strong">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <input
+                          type="text"
+                          placeholder="Search models..."
+                          value={modelSearch}
+                          onChange={(e) => setModelSearch(e.target.value)}
+                          className="w-full bg-bg-surface border border-border-strong rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-text-muted focus:outline-none focus:border-indigo-500/50"
+                          autoFocus
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
+                    
+                    <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-border-strong">
+                      {/* Favorites section */}
+                      {favorites.length > 0 && !modelSearch && (
+                        <>
+                          <div className="px-3 py-1.5 text-[9px] font-bold text-amber-400 bg-bg-hover flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-amber-400" />
+                            FAVORITE MODELS
+                          </div>
+                          {(models.length > 0 ? models : FALLBACK_MODELS)
+                            .filter(m => favorites.includes(m.id))
+                            .map(m => (
+                              <div
+                                key={`fav-${m.id}`}
+                                onClick={() => {
+                                  setSelectedModel(m)
+                                  localStorage.setItem('documind_preferred_model', m.id)
+                                  if (activeWorkspace) {
+                                    updateAiSettings(activeWorkspace.id, {
+                                      default_chat_endpoint_id: m.endpoint_id,
+                                      default_chat_model: m.id,
+                                    }).catch(console.error)
+                                  }
+                                  setModelMenuOpen(false)
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-indigo-600/10 text-indigo-400' : ''}`}
+                              >
+                                <div className="flex flex-col min-w-0 pr-2">
+                                  <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
+                                  <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleFavorite(m.id, e)}
+                                  className="p-1 text-amber-400 hover:text-text-muted transition-colors shrink-0"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                                </button>
+                              </div>
+                            ))}
+                          <div className="border-t border-border-strong" />
+                        </>
+                      )}
+
+                      <div className="px-3 py-1.5 text-[9px] font-bold text-text-subtle bg-bg-hover">
+                        {modelSearch ? 'SEARCH RESULTS' : 'ALL AVAILABLE MODELS'}
+                      </div>
+                      {(models.length > 0 ? models : FALLBACK_MODELS)
+                        .filter(m => 
+                          !modelSearch || 
+                          m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
+                          m.provider_label.toLowerCase().includes(modelSearch.toLowerCase())
+                        )
+                        .map(m => (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              setSelectedModel(m)
+                              localStorage.setItem('documind_preferred_model', m.id)
+                              if (activeWorkspace) {
+                                updateAiSettings(activeWorkspace.id, {
+                                  default_chat_endpoint_id: m.endpoint_id,
+                                  default_chat_model: m.id,
+                                }).catch(console.error)
+                              }
+                              setModelMenuOpen(false)
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 hover:bg-bg-hover cursor-pointer transition-colors text-left ${selectedModel?.id === m.id ? 'bg-indigo-600/10 text-indigo-400' : ''}`}
+                          >
+                            <div className="flex flex-col min-w-0 pr-2">
+                              <span className="text-xs font-semibold truncate text-foreground">{m.name}</span>
+                              <span className="text-[8px] text-text-muted uppercase font-bold tracking-wider">{m.provider_label}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(m.id, e)}
+                              className="p-1 text-text-muted hover:text-amber-400 transition-colors shrink-0"
+                            >
+                              <Star className={`w-3.5 h-3.5 ${favorites.includes(m.id) ? 'fill-amber-400 text-amber-400' : ''}`} />
+                            </button>
+                          </div>
+                        ))}
+                        
+                      {(models.length > 0 ? models : FALLBACK_MODELS).filter(m => 
+                          !modelSearch || 
+                          m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
+                          m.provider_label.toLowerCase().includes(modelSearch.toLowerCase())
+                        ).length === 0 && (
+                          <div className="px-3 py-4 text-center text-xs text-text-muted">
+                            No models found matching "{modelSearch}"
+                          </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] text-text-muted hidden md:inline">⏎ Send · ⇧⏎ New line</span>
+
+              {/* Right: Keyboard shortcut hint + Send button */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-[10px] text-text-muted hidden md:inline">
+                  <kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border-strong font-sans text-[9px]">⏎</kbd> Kirim · <kbd className="px-1.5 py-0.5 rounded bg-bg-surface border border-border-strong font-sans text-[9px]">⇧⏎</kbd> Baris baru
+                </span>
+                
                 <button
+                  type="button"
                   id="send-message-btn"
                   onClick={() => sendMessage()}
                   disabled={!input.trim() || loading}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/20 active:scale-95 shrink-0"
+                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 disabled:opacity-35 disabled:cursor-not-allowed text-white transition-all shadow-md shadow-indigo-500/25 active:scale-95 shrink-0 cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5 text-white" />
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
+                  )}
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* Mobile history drawer */}
+      {/* Slide-over history drawer */}
       {historyDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setHistoryDrawerOpen(false)} />
-          <div className="relative z-10 w-64 h-full bg-background border-r border-border-subtle flex flex-col animate-fade-in">
+        <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setHistoryDrawerOpen(false)} />
+          <div className="relative z-10 w-72 sm:w-80 h-full bg-background border-r border-border-strong shadow-2xl flex flex-col animate-fade-in">
             <div className="flex items-center justify-between p-4 border-b border-border-subtle">
-              <h2 className="text-sm font-bold">Query History</h2>
-              <button className="p-1 text-text-muted hover:text-foreground" onClick={() => setHistoryDrawerOpen(false)}>
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-sm font-bold text-foreground">Riwayat Percakapan</h2>
+              </div>
+              <button className="p-1 rounded-lg text-text-muted hover:text-foreground hover:bg-bg-hover transition-colors cursor-pointer" onClick={() => setHistoryDrawerOpen(false)}>
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 border-b border-border-subtle">
+            <div className="p-3 border-b border-border-subtle">
               <button
                 onClick={() => {
                   router.push('/dashboard/chat');
                   setActiveConversationId(null);
                   setMessages([]);
+                  setInput('');
                   setHistoryDrawerOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-border-strong hover:border-indigo-500/40 hover:bg-indigo-600/5 text-xs font-medium text-text-subtle hover:text-foreground transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer"
               >
-                <MessageSquare className="w-3.5 h-3.5" /> New conversation
+                <Plus className="w-3.5 h-3.5" /> Percakapan Baru
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
-              {conversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => {
-                    window.history.pushState(null, '', `/dashboard/chat?id=${conv.id}`);
-                    selectThread(conv.id);
-                    setHistoryDrawerOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors group ${activeConversationId === conv.id ? 'bg-indigo-600/15 text-indigo-300' : 'hover:bg-bg-hover text-text-subtle hover:text-foreground'
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5 scrollbar-thin">
+              {conversations.length === 0 ? (
+                <div className="text-center py-8 text-xs text-text-muted">
+                  Belum ada riwayat percakapan.
+                </div>
+              ) : (
+                conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => {
+                      window.history.pushState(null, '', `/dashboard/chat?id=${conv.id}`);
+                      selectThread(conv.id);
+                      setHistoryDrawerOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-xl transition-all cursor-pointer group ${
+                      activeConversationId === conv.id 
+                        ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30' 
+                        : 'hover:bg-bg-hover text-text-subtle hover:text-foreground border border-transparent'
                     }`}
-                >
-                  <div className="text-xs line-clamp-2 transition-colors leading-relaxed">{conv.title}</div>
-                  <div className="text-[10px] text-text-muted mt-1">{formatRelativeTime(conv.updated_at)}</div>
-                </button>
-              ))}
+                  >
+                    <div className="text-xs font-medium line-clamp-2 transition-colors leading-relaxed">{conv.title || 'Percakapan Tanpa Judul'}</div>
+                    <div className="text-[10px] text-text-muted mt-1 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
+                      {formatRelativeTime(conv.updated_at)}
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
