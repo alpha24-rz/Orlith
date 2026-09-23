@@ -12,6 +12,7 @@ import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
+import { ThumbsUp, ThumbsDown } from 'lucide-react'
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -625,16 +626,20 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
               </button>
             )}
             <button
-              onClick={() => setFeedback('up')}
-              className={`text-[11px] transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5 ${feedback === 'up' ? 'text-foreground font-semibold' : 'text-text-muted hover:text-foreground'}`}
+              onClick={() => setFeedback(feedback === 'up' ? null : 'up')}
+              title="Bagus"
+              aria-label="Bagus"
+              className={`p-1 rounded hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'up' ? 'text-foreground bg-white/10' : 'text-text-muted hover:text-foreground'}`}
             >
-              Bagus
+              <ThumbsUp className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => setFeedback('down')}
-              className={`text-[11px] transition-colors cursor-pointer px-1 py-0.5 rounded hover:bg-white/5 ${feedback === 'down' ? 'text-foreground font-semibold' : 'text-text-muted hover:text-foreground'}`}
+              onClick={() => setFeedback(feedback === 'down' ? null : 'down')}
+              title="Kurang"
+              aria-label="Kurang"
+              className={`p-1 rounded hover:bg-white/5 transition-colors cursor-pointer ${feedback === 'down' ? 'text-foreground bg-white/10' : 'text-text-muted hover:text-foreground'}`}
             >
-              Kurang
+              <ThumbsDown className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
