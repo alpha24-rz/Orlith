@@ -13,7 +13,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
-import { BorderBeam } from '@/components/ui/BorderBeam'
+import { BorderBeam } from 'border-beam'
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -1786,8 +1786,8 @@ function ChatPageInner() {
 
         {/* Input Area */}
         <div className="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 shrink-0">
-          <div className="relative group/input rounded-2xl border border-border-strong bg-bg-panel/90 shadow-xl shadow-black/10 focus-within:border-border-strong transition-all p-3 sm:p-3.5 flex flex-col gap-2.5">
-            <BorderBeam size={320} duration={8} borderWidth={1.5} rainbow={true} glow={true} />
+          <BorderBeam size="md" colorVariant="colorful" strength={0.7} className="w-full">
+            <div className="relative group/input rounded-2xl border border-border-strong bg-bg-panel/90 shadow-xl shadow-black/10 focus-within:border-border-strong transition-all p-3 sm:p-3.5 flex flex-col gap-2.5">
 
             {/* Mode Switcher Tabs */}
             <div className="relative z-10 flex items-center justify-between gap-2 pb-1 border-b border-border-subtle/40">
@@ -1977,7 +1977,8 @@ function ChatPageInner() {
               </div>
             </div>
 
-          </div>
+            </div>
+          </BorderBeam>
         </div>
       </div>
 
