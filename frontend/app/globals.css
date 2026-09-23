@@ -119,3 +119,90 @@ body {
 .react-flow__controls-button:hover {
   background-color: var(--bg-hover) !important;
 }
+
+/* Animated Rainbow Border Beam */
+@keyframes border-beam {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+@keyframes border-beam-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.border-beam-container {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: var(--border-width, 1.5px) solid transparent;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.border-beam-container::after {
+  content: "";
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  width: var(--size, 280px);
+  animation: border-beam var(--duration, 8s) infinite linear;
+  animation-delay: var(--delay, 0s);
+  background: var(--beam-gradient, linear-gradient(to left, #ff0080, #7928ca, #0070f3, #00dfd8, #43e97b, #ffaa40, #ff0080, transparent));
+  offset-anchor: var(--anchor, 90%) 50%;
+  offset-path: rect(0 auto auto 0 round 16px);
+}
+
+.border-beam-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.35;
+  filter: blur(10px);
+}
+
+.border-beam-glow::after {
+  content: "";
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  width: var(--size, 280px);
+  animation: border-beam var(--duration, 8s) infinite linear;
+  animation-delay: var(--delay, 0s);
+  background: var(--beam-gradient, linear-gradient(to left, #ff0080, #7928ca, #0070f3, #00dfd8, #43e97b, #ffaa40, #ff0080, transparent));
+  offset-anchor: var(--anchor, 90%) 50%;
+  offset-path: rect(0 auto auto 0 round 16px);
+}
+
+@supports not (offset-path: rect(0 auto auto 0 round 16px)) {
+  .border-beam-container::after {
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    aspect-ratio: auto;
+    background: conic-gradient(from 0deg, transparent 0 60%, #ff0080 70%, #7928ca 75%, #0070f3 82%, #00dfd8 88%, #43e97b 93%, #ffaa40 96%, #ff0080 98%, transparent 100%);
+    animation: border-beam-spin var(--duration, 8s) infinite linear;
+    offset-path: none;
+  }
+  .border-beam-glow::after {
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    aspect-ratio: auto;
+    background: conic-gradient(from 0deg, transparent 0 60%, #ff0080 70%, #7928ca 75%, #0070f3 82%, #00dfd8 88%, #43e97b 93%, #ffaa40 96%, #ff0080 98%, transparent 100%);
+    animation: border-beam-spin var(--duration, 8s) infinite linear;
+    offset-path: none;
+  }
+}

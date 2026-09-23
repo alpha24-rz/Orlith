@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { BorderBeam } from '@/components/ui/BorderBeam'
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -1785,10 +1786,11 @@ function ChatPageInner() {
 
         {/* Input Area */}
         <div className="w-full max-w-4xl mx-auto px-4 pb-4 pt-2 shrink-0">
-          <div className="rounded-2xl border border-border-strong bg-bg-panel/90 shadow-xl shadow-black/10 focus-within:border-border-strong transition-all p-3 sm:p-3.5 flex flex-col gap-2.5">
-            
+          <div className="relative group/input rounded-2xl border border-border-strong bg-bg-panel/90 shadow-xl shadow-black/10 focus-within:border-border-strong transition-all p-3 sm:p-3.5 flex flex-col gap-2.5">
+            <BorderBeam size={320} duration={8} borderWidth={1.5} rainbow={true} glow={true} />
+
             {/* Mode Switcher Tabs */}
-            <div className="flex items-center justify-between gap-2 pb-1 border-b border-border-subtle/40">
+            <div className="relative z-10 flex items-center justify-between gap-2 pb-1 border-b border-border-subtle/40">
               <div className="flex items-center gap-1">
                 {/* Standard RAG mode tab */}
                 <button
@@ -1842,11 +1844,11 @@ function ChatPageInner() {
                   : "Tanyakan apa saja tentang dokumen Anda..."
               }
               rows={2}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[48px] max-h-[160px]"
+              className="relative z-10 w-full bg-transparent text-sm text-foreground placeholder:text-text-muted outline-none resize-none leading-relaxed min-h-[48px] max-h-[160px]"
             />
 
             {/* Bottom bar inside dock */}
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-subtle/40">
+            <div className="relative z-10 flex items-center justify-between gap-2 pt-1 border-t border-border-subtle/40">
               {/* Model Picker */}
               <div className="relative">
                 <button
