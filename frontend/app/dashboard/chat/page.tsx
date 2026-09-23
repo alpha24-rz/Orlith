@@ -14,6 +14,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { BorderBeam } from 'border-beam'
+import { ThinkingOrb } from 'thinking-orbs'
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -165,8 +166,9 @@ function AgentStepsPanel({ steps, isRunning, streamingText }: {
 
       {/* Loading state before answer */}
       {isRunning && !streamingText && (
-        <div className="text-text-muted text-xs mt-1">
-          Menganalisis dokumen...
+        <div className="flex items-center gap-2.5 text-text-muted text-xs mt-2 py-1">
+          <ThinkingOrb state="working" size={20} />
+          <span>Menganalisis dokumen...</span>
         </div>
       )}
 
@@ -767,8 +769,9 @@ function DeepResearchPanel({
         ))}
 
         {isRunning && !isDone && !hasError && (
-          <div className="text-[11px] text-text-muted">
-            {writingReport ? 'Menyusun laporan final...' : 'Menganalisis dokumen...'}
+          <div className="flex items-center gap-2 text-[11px] text-text-muted mt-2 pt-1">
+            <ThinkingOrb state={writingReport ? 'composing' : 'searching'} size={20} />
+            <span>{writingReport ? 'Menyusun laporan final...' : 'Menganalisis dokumen...'}</span>
           </div>
         )}
       </div>
@@ -1697,7 +1700,8 @@ function ChatPageInner() {
         {/* Messages scroll area */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 flex flex-col scrollbar-none">
           {loadingThread && messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-text-muted">
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-text-muted animate-fade-in">
+              <ThinkingOrb state="connecting" size={64} />
               <span className="text-xs font-medium">Memuat percakapan...</span>
             </div>
           ) : messages.length === 0 ? (
@@ -1765,8 +1769,8 @@ function ChatPageInner() {
               )}
               {/* Regular streaming indicator */}
               {loading && !agentMode && (
-                <div className="flex flex-col mb-6">
-                  <div className="text-xs font-semibold text-text-muted mb-1">Orlith</div>
+                <div className="flex flex-col mb-6 animate-fade-in">
+                  <div className="text-xs font-semibold text-text-muted mb-2">Orlith</div>
                   <div className="text-sm text-foreground/90 leading-relaxed">
                     {streamingText ? (
                       <p className="whitespace-pre-wrap">
@@ -1774,7 +1778,13 @@ function ChatPageInner() {
                         <span className="inline-block w-1.5 h-4 bg-foreground ml-1 align-middle animate-caret">|</span>
                       </p>
                     ) : (
-                      <span className="text-xs text-text-muted">Mencari referensi & menghasilkan jawaban...</span>
+                      <div className="flex items-center gap-3.5 py-2">
+                        <ThinkingOrb state="searching" size={64} />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-foreground">Sedang mencari referensi...</span>
+                          <span className="text-[11px] text-text-muted">Menganalisis dokumen di workspace Anda</span>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
