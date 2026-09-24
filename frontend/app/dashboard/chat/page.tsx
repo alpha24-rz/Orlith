@@ -14,7 +14,22 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
-import { ThumbsUp, ThumbsDown, Check, Copy } from 'lucide-react'
+import {
+  ThumbsUp,
+  ThumbsDown,
+  Check,
+  Copy,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  ShieldCheck,
+  Sparkles,
+  BookOpen,
+} from 'lucide-react'
 import { BorderBeam } from 'border-beam'
 import { ThinkingOrb } from 'thinking-orbs'
 
@@ -187,8 +202,263 @@ function AgentStepsPanel({ steps, isRunning, streamingText }: {
   )
 }
 
+// ─── Verification Studio State & Types ────────────────────────────────────────
+export interface ViewerDocState {
+  id: string
+  name: string
+  page: number
+  snippet: string
+  fullText?: string
+  relevanceScore?: number
+  citationNumber?: number
+}
+
+// ─── Document Proof & Verification Studio Component ──────────────────────────
+interface DocumentProofStudioProps {
+  doc: ViewerDocState
+  mode: 'split' | 'fullscreen'
+  token?: string | null
+  onClose: () => void
+  onToggleMode: () => void
+  onAskAi: (prompt: string) => void
+  onPageChange: (newPage: number) => void
+}
+
+function DocumentProofStudio({
+  doc,
+  mode,
+  token,
+  onClose,
+  onToggleMode,
+  onAskAi,
+  onPageChange,
+}: DocumentProofStudioProps) {
+  const [copiedQuote, setCopiedQuote] = useState(false)
+  const [pageInput, setPageInput] = useState(String(doc.page))
+  const [showCallout, setShowCallout] = useState(true)
+
+  useEffect(() => {
+    setPageInput(String(doc.page))
+  }, [doc.page])
+
+  const handleCopyQuote = () => {
+    const textToCopy = `"${doc.fullText || doc.snippet}" — ${doc.name}, Halaman ${doc.page}`
+    navigator.clipboard.writeText(textToCopy)
+    setCopiedQuote(true)
+    setTimeout(() => setCopiedQuote(false), 2000)
+  }
+
+  const handlePageSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const p = parseInt(pageInput.trim())
+    if (!isNaN(p) && p > 0) {
+      onPageChange(p)
+    }
+  }
+
+  const relevancePct = doc.relevanceScore ? Math.round(doc.relevanceScore * 100) : 94
+  const isPdf = doc.name.toLowerCase().endsWith('.pdf')
+  const downloadUrl = `/api/documents/${doc.id}/download?token=${encodeURIComponent(token || '')}#page=${doc.page}`
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-background border-l border-border-subtle relative select-none">
+      {/* Studio Header Bar */}
+      <div className="h-13 border-b border-border-subtle bg-bg-panel/90 px-4 sm:px-5 flex items-center justify-between shrink-0 gap-3">
+        {/* Document Info */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/10">
+            <FileText className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="min-w-0 flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-foreground truncate max-w-[140px] sm:max-w-[200px] md:max-w-xs" title={doc.name}>
+                {doc.name}
+              </span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <ShieldCheck className="w-3 h-3" />
+                <span>{relevancePct}% Terverifikasi</span>
+              </span>
+            </div>
+            <span className="text-[10px] text-text-muted">
+              {doc.citationNumber ? `Sitasi Resmi [${doc.citationNumber}]` : 'Sumber Rujukan'}
+            </span>
+          </div>
+        </div>
+
+        {/* Studio Window Controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Page Navigator */}
+          <div className="flex items-center bg-bg-input border border-border-subtle rounded-lg px-1 py-0.5 mr-1">
+            <button
+              onClick={() => onPageChange(Math.max(1, doc.page - 1))}
+              disabled={doc.page <= 1}
+              className="p-1 rounded text-text-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/5 transition-colors cursor-pointer"
+              title="Halaman Sebelumnya"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <form onSubmit={handlePageSubmit} className="flex items-center mx-1">
+              <span className="text-[11px] text-text-muted mr-1">Hal.</span>
+              <input
+                type="text"
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onBlur={handlePageSubmit}
+                className="w-8 text-center bg-transparent border-0 text-xs font-mono font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50 rounded"
+              />
+            </form>
+            <button
+              onClick={() => onPageChange(doc.page + 1)}
+              className="p-1 rounded text-text-muted hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+              title="Halaman Selanjutnya"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Open in New Tab */}
+          <a
+            href={downloadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 rounded-lg border border-border-subtle hover:bg-bg-hover text-text-muted hover:text-foreground transition-colors cursor-pointer"
+            title="Buka Dokumen Asli di Tab Baru"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+
+          {/* Toggle Split / Fullscreen */}
+          <button
+            onClick={onToggleMode}
+            className="p-1.5 rounded-lg border border-border-subtle hover:bg-bg-hover text-text-muted hover:text-foreground transition-colors cursor-pointer"
+            title={mode === 'fullscreen' ? 'Tampilan Berdampingan (Split)' : 'Layar Penuh (Maximize)'}
+          >
+            {mode === 'fullscreen' ? (
+              <Minimize2 className="w-3.5 h-3.5" />
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {/* Close Studio */}
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg border border-border-subtle hover:bg-rose-500/10 hover:border-rose-500/30 text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
+            title="Tutup Studio Verifikasi"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Grounded Verification Callout Banner */}
+      {showCallout && (
+        <div className="mx-4 mt-3 mb-2 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/5 backdrop-blur-md shadow-lg shadow-amber-500/5 flex flex-col gap-2 relative animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                Visual Grounding • Terverifikasi dari Dokumen
+              </span>
+              <span className="text-[10px] text-text-muted font-mono">
+                Hal. {doc.page}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowCallout(false)}
+              className="text-[11px] text-text-muted hover:text-foreground cursor-pointer"
+              title="Sembunyikan kartu kutipan"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p className="text-xs text-foreground/90 italic leading-relaxed pl-2.5 border-l-2 border-amber-400/80 my-0.5 select-text">
+            &ldquo;{doc.fullText || doc.snippet}&rdquo;
+          </p>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-amber-500/20 text-xs">
+            <button
+              onClick={handleCopyQuote}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-text-subtle hover:text-foreground transition-all cursor-pointer"
+            >
+              {copiedQuote ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">Tersalin</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Salin Kutipan Resmi</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => onAskAi(`Jelaskan lebih mendalam dan rinci mengenai fakta ini pada halaman ${doc.page} dokumen "${doc.name}": "${(doc.fullText || doc.snippet).slice(0, 100)}..."`)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[11px] font-semibold text-amber-300 transition-all cursor-pointer ml-auto"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Tanyakan AI tentang kutipan ini</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Document Body */}
+      <div className="flex-1 w-full bg-[#18191c] overflow-hidden flex flex-col relative">
+        {isPdf ? (
+          <iframe
+            key={`${doc.id}-page-${doc.page}`}
+            src={downloadUrl}
+            className="flex-1 w-full h-full border-none select-none bg-neutral-900"
+            title={doc.name}
+          />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
+            <div className="w-full max-w-xl bg-bg-panel border border-border-strong rounded-2xl p-6 shadow-xl text-xs text-text-subtle select-text">
+              <div className="flex items-center justify-between pb-3 border-b border-border-subtle mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span className="font-semibold text-foreground">{doc.name}</span>
+                </div>
+                <span className="text-[10px] font-mono text-text-muted">Hal. {doc.page}</span>
+              </div>
+              <div className="bg-bg-input p-4 rounded-xl border border-border-subtle mb-4 font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap">
+                {doc.fullText || doc.snippet}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-text-muted pt-2 border-t border-border-subtle">
+                <span>Doc ID: {doc.id}</span>
+                <a
+                  href={downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-400 hover:text-indigo-300 font-medium"
+                >
+                  Unduh Dokumen Lengkap →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Citation Pill Component ─────────────────────────────────────────────────
-function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; index: number; onOpenDoc: () => void }) {
+function CitationPill({
+  citation,
+  index,
+  isActive,
+  onOpenDoc,
+}: {
+  citation: Citation
+  index: number
+  isActive?: boolean
+  onOpenDoc: () => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const num = citation.citationNumber ?? index + 1
@@ -212,18 +482,29 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-border-strong hover:bg-bg-hover text-xs text-text-subtle hover:text-foreground transition-colors cursor-pointer"
+        onClick={() => onOpenDoc()}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setExpanded(!expanded)
+        }}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-all cursor-pointer ${
+          isActive
+            ? 'border-amber-500/80 bg-amber-500/15 text-amber-300 font-semibold shadow-sm shadow-amber-500/20 ring-1 ring-amber-400/40'
+            : 'border-border-strong hover:bg-bg-hover text-text-subtle hover:text-foreground'
+        }`}
+        title={`Buka Dokumen: ${citation.docName} (Hal. ${citation.page})`}
       >
-        <span className="max-w-[120px] truncate text-[11px] font-medium">{citation.docName.replace(/\.[^.]+$/, '')}</span>
+        <FileText className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-text-muted'}`} />
+        <span className="max-w-[130px] truncate text-[11px] font-medium">{citation.docName.replace(/\.[^.]+$/, '')}</span>
         <span className="text-[10px] text-text-muted">p.{citation.page}</span>
-        <sup className="text-[9px] font-bold text-indigo-400">[{num}]</sup>
+        <sup className={`text-[9.5px] font-bold ${isActive ? 'text-amber-400 font-extrabold' : 'text-indigo-400'}`}>[{num}]</sup>
       </button>
+
       {expanded && (
-        <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-border-strong bg-bg-panel shadow-2xl p-4 z-20">
+        <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-border-strong bg-bg-panel shadow-2xl p-4 z-30 animate-fade-in">
           {/* Header */}
           <div className="flex items-start gap-2 mb-3">
-            <div className="w-6 h-6 rounded border border-border-strong flex items-center justify-center shrink-0 text-xs font-bold text-foreground">
+            <div className="w-6 h-6 rounded border border-amber-500/50 bg-amber-500/10 flex items-center justify-center shrink-0 text-xs font-bold text-amber-400">
               {num}
             </div>
             <div className="flex-1 min-w-0">
@@ -231,7 +512,7 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] text-text-muted">Halaman {citation.page}</span>
                 {relevancePct !== null && (
-                  <span className="text-[10px] text-text-muted">
+                  <span className="text-[10px] text-emerald-400 font-medium">
                     {relevancePct}% match
                   </span>
                 )}
@@ -247,9 +528,9 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
           {/* Actions */}
           <button
             onClick={(e) => { e.stopPropagation(); onOpenDoc(); setExpanded(false); }}
-            className="w-full py-1.5 rounded-md border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-colors cursor-pointer"
+            className="w-full py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
           >
-            Buka Dokumen
+            Buka di Verification Studio →
           </button>
         </div>
       )}
@@ -258,11 +539,12 @@ function CitationPill({ citation, index, onOpenDoc }: { citation: Citation; inde
 }
 
 // ─── Inline Citation Renderer ─────────────────────────────────────────────────
-// Parse [N] patterns di teks AI menjadi superscript interaktif
+// Parse [N] patterns di teks AI menjadi badge interaktif dengan Visual Grounding
 function renderContentWithCitations(
   content: string,
   citations: Citation[],
-  onCitationClick: (citation: Citation) => void
+  onCitationClick: (citation: Citation) => void,
+  activeCitationNum?: number | null
 ): React.ReactNode[] {
   const parts = content.split(/(\[\d+(?:,\s*\d+)*\])/g)
 
@@ -271,20 +553,25 @@ function renderContentWithCitations(
     if (match) {
       const nums = match[1].split(',').map(n => parseInt(n.trim()))
       return (
-        <span key={i} className="inline-flex gap-0.5">
+        <span key={i} className="inline-flex gap-1 align-baseline mx-0.5">
           {nums.map(num => {
             const citation = citations.find(c =>
               (c.citationNumber ?? 0) === num ||
               citations.indexOf(c) + 1 === num
             )
+            const isActive = activeCitationNum === num
             return (
               <button
                 key={num}
                 onClick={() => citation && onCitationClick(citation)}
-                title={citation ? `${citation.docName} — p.${citation.page}` : `Sumber [${num}]`}
-                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-[9px] font-black text-indigo-300 hover:bg-indigo-500/40 hover:text-indigo-200 transition-all cursor-pointer align-super leading-none"
+                title={citation ? `${citation.docName} — Hal. ${citation.page}` : `Sumber [${num}]`}
+                className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer select-none leading-none shadow-sm ${
+                  isActive
+                    ? 'bg-amber-400 text-black ring-2 ring-amber-300 shadow-md shadow-amber-500/50 scale-110 font-extrabold z-10'
+                    : 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/40 hover:text-indigo-200 hover:scale-105'
+                }`}
               >
-                {num}
+                [{num}]
               </button>
             )
           })}
@@ -298,15 +585,16 @@ function renderContentWithCitations(
 function processCitationsInNode(
   node: ReactNode,
   citations: Citation[],
-  onCitationClick: (citation: Citation) => void
+  onCitationClick: (citation: Citation) => void,
+  activeCitationNum?: number | null
 ): ReactNode {
   if (typeof node === 'string') {
-    return renderContentWithCitations(node, citations, onCitationClick)
+    return renderContentWithCitations(node, citations, onCitationClick, activeCitationNum)
   }
   if (Array.isArray(node)) {
     return node.map((child, i) => (
       <Fragment key={i}>
-        {processCitationsInNode(child, citations, onCitationClick)}
+        {processCitationsInNode(child, citations, onCitationClick, activeCitationNum)}
       </Fragment>
     ))
   }
@@ -318,7 +606,7 @@ function processCitationsInNode(
     if (children) {
       return cloneElement(node, {
         ...(node.props as any),
-        children: processCitationsInNode(children, citations, onCitationClick)
+        children: processCitationsInNode(children, citations, onCitationClick, activeCitationNum)
       } as any)
     }
   }
@@ -399,18 +687,27 @@ function CodeBlock({ language, codeString, props }: { language: string; codeStri
 
 interface ChatBubbleProps {
   message: ChatMessage
+  activeCitationDocId?: string | null
+  activeCitationPage?: number | null
+  activeCitationNum?: number | null
   onOpenDoc: (citation: Citation) => void
   onEditSubmit?: (messageId: string, newContent: string) => void
   onRegenerate?: (messageId: string) => void
 }
 
 // ─── Chat Bubble Component ────────────────────────────────────────────────────
-function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubbleProps) {
+function ChatBubble({
+  message,
+  activeCitationDocId,
+  activeCitationPage,
+  activeCitationNum,
+  onOpenDoc,
+  onEditSubmit,
+  onRegenerate,
+}: ChatBubbleProps) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
-  const [activeCitation, setActiveCitation] = useState<Citation | null>(null)
-  const citationPanelRef = useRef<HTMLDivElement>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(message.content)
 
@@ -425,26 +722,8 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   }
 
   const handleCitationClick = (citation: Citation) => {
-    setActiveCitation(activeCitation?.docId === citation.docId && activeCitation?.page === citation.page ? null : citation)
+    onOpenDoc(citation)
   }
-
-  useEffect(() => {
-    if (!activeCitation) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const isCitationBtn = target.closest('button')?.getAttribute('title')?.includes('Sumber') || target.closest('button')?.getAttribute('title')?.includes('— p.')
-      
-      if (citationPanelRef.current && !citationPanelRef.current.contains(target) && !isCitationBtn) {
-        setActiveCitation(null)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [activeCitation])
 
   if (isUser) {
     if (isEditing) {
@@ -516,12 +795,12 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
   const renderers: Components = {
     p: ({ children }) => (
       <p className="mb-3.5 last:mb-0 leading-relaxed">
-        {processCitationsInNode(children, citations, handleCitationClick)}
+        {processCitationsInNode(children, citations, handleCitationClick, activeCitationNum)}
       </p>
     ),
     li: ({ children }) => (
       <li className="mb-1.5 leading-relaxed">
-        {processCitationsInNode(children, citations, handleCitationClick)}
+        {processCitationsInNode(children, citations, handleCitationClick, activeCitationNum)}
       </li>
     ),
     table: ({ children }) => (
@@ -535,7 +814,7 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
     th: ({ children }) => <th>{children}</th>,
     td: ({ children }) => (
       <td>
-        {processCitationsInNode(children, citations, handleCitationClick)}
+        {processCitationsInNode(children, citations, handleCitationClick, activeCitationNum)}
       </td>
     ),
     h1: ({ children }) => (
@@ -608,41 +887,23 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
           </div>
         </div>
 
-
-        {/* Active citation detail panel */}
-        {activeCitation && (
-          <div ref={citationPanelRef} className="mb-3 rounded-lg border border-border-strong bg-bg-panel p-3.5 animate-fade-in">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-foreground">{activeCitation.docName}</span>
-                <span className="text-[10px] text-text-muted">Halaman {activeCitation.page}</span>
-                {activeCitation.relevanceScore && (
-                  <span className="text-[10px] text-text-muted">{Math.round(activeCitation.relevanceScore * 100)}% match</span>
-                )}
-              </div>
-              <button onClick={() => setActiveCitation(null)} className="text-xs text-text-muted hover:text-foreground cursor-pointer">
-                Tutup
-              </button>
-            </div>
-            <p className="text-[12px] text-text-subtle italic leading-relaxed">
-              &ldquo;{activeCitation.fullText || activeCitation.snippet}&rdquo;
-            </p>
-            <button
-              onClick={() => { onOpenDoc(activeCitation); setActiveCitation(null); }}
-              className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors cursor-pointer"
-            >
-              Buka dokumen di viewer →
-            </button>
-          </div>
-        )}
-
         {/* Citations pills + source tags */}
         {citations.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-2.5">
             <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider mr-0.5">Sumber:</span>
-            {citations.map((c, i) => (
-              <CitationPill key={i} citation={c} index={i} onOpenDoc={() => onOpenDoc(c)} />
-            ))}
+            {citations.map((c, i) => {
+              const isPillActive = (c.citationNumber && c.citationNumber === activeCitationNum) ||
+                (activeCitationDocId === c.docId && activeCitationPage === c.page)
+              return (
+                <CitationPill
+                  key={i}
+                  citation={c}
+                  index={i}
+                  isActive={isPillActive}
+                  onOpenDoc={() => onOpenDoc(c)}
+                />
+              )
+            })}
             {message.source_mode && message.source_mode === 'DOCUMENT' && (
               <span className="px-2 py-0.5 rounded text-[11px] font-medium border border-border-strong text-text-subtle">
                 Dokumen Terverifikasi
@@ -1093,9 +1354,25 @@ function ChatPageInner() {
   const [reportContent, setReportContent] = useState('')
   const [reportQuery, setReportQuery] = useState('')
 
-  // Doc Viewer Modal states
+  // Doc Viewer & Verification Studio states
   const [viewerOpen, setViewerOpen] = useState(false)
-  const [viewerDoc, setViewerDoc] = useState<{ id: string; name: string; page: number; snippet: string } | null>(null)
+  const [viewerDoc, setViewerDoc] = useState<ViewerDocState | null>(null)
+  const [viewerMode, setViewerMode] = useState<'split' | 'fullscreen'>('split')
+  const [activeCitationNum, setActiveCitationNum] = useState<number | null>(null)
+
+  const handleOpenDoc = useCallback((citation: Citation) => {
+    setViewerDoc({
+      id: citation.docId,
+      name: citation.docName,
+      page: citation.page,
+      snippet: citation.snippet,
+      fullText: citation.fullText,
+      relevanceScore: citation.relevanceScore,
+      citationNumber: citation.citationNumber,
+    })
+    setActiveCitationNum(citation.citationNumber ?? null)
+    setViewerOpen(true)
+  }, [])
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -1768,7 +2045,9 @@ function ChatPageInner() {
   return (
     <div className="flex h-full animate-fade-in relative overflow-hidden">
       {/* Main chat */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background h-full">
+      <div className={`flex flex-col min-w-0 bg-background h-full transition-all duration-300 ${
+        viewerOpen && viewerDoc && viewerMode === 'split' ? 'w-full lg:w-[50%]' : 'flex-1'
+      }`}>
         {/* Top Context Header Bar */}
         <div className="h-13 border-b border-border-subtle bg-background px-4 sm:px-6 flex items-center justify-between shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
@@ -1860,10 +2139,10 @@ function ChatPageInner() {
                 <ChatBubble
                   key={m.id}
                   message={m}
-                  onOpenDoc={(citation) => {
-                    setViewerDoc({ id: citation.docId, name: citation.docName, page: citation.page, snippet: citation.snippet })
-                    setViewerOpen(true)
-                  }}
+                  activeCitationDocId={viewerOpen && viewerDoc ? viewerDoc.id : null}
+                  activeCitationPage={viewerOpen && viewerDoc ? viewerDoc.page : null}
+                  activeCitationNum={viewerOpen ? activeCitationNum : null}
+                  onOpenDoc={handleOpenDoc}
                   onEditSubmit={handleEditSubmit}
                   onRegenerate={handleRegenerate}
                 />
@@ -2110,6 +2389,29 @@ function ChatPageInner() {
         </div>
       </div>
 
+      {/* Side-by-Side Document Proof Studio (Desktop Split Mode) */}
+      {viewerOpen && viewerDoc && viewerMode === 'split' && (
+        <div className="hidden lg:flex w-full lg:w-[50%] h-full flex-col border-l border-border-strong bg-bg-panel/95 z-20 overflow-hidden shadow-2xl animate-fade-in">
+          <DocumentProofStudio
+            doc={viewerDoc}
+            mode="split"
+            token={token}
+            onClose={() => {
+              setViewerOpen(false)
+              setActiveCitationNum(null)
+            }}
+            onToggleMode={() => setViewerMode('fullscreen')}
+            onAskAi={(prompt) => {
+              setInput(prompt)
+              inputRef.current?.focus()
+            }}
+            onPageChange={(newPage) => {
+              setViewerDoc(prev => prev ? { ...prev, page: newPage } : null)
+            }}
+          />
+        </div>
+      )}
+
       {/* Slide-over history drawer */}
       {historyDrawerOpen && (
         <div className="fixed inset-0 z-50 flex">
@@ -2276,82 +2578,38 @@ function ChatPageInner() {
         />
       )}
 
-      {/* Document Viewer Modal */}
+      {/* Fullscreen Desktop Studio Modal OR Mobile Slide-over Overlay */}
       {viewerOpen && viewerDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setViewerOpen(false)} />
-          <div className="relative z-10 w-full sm:max-w-4xl h-[100dvh] sm:h-[85vh] rounded-none sm:rounded-2xl border-0 sm:border border-border-strong bg-bg-panel shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border-subtle bg-bg-input">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <span className="text-xs font-semibold text-foreground truncate max-w-[150px] sm:max-w-md">{viewerDoc.name}</span>
-                <span className="text-[11px] font-mono text-text-muted border border-border-subtle px-1.5 py-0.5 rounded">p. {viewerDoc.page}</span>
-                <a
-                  href={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-2 py-1 rounded border border-border-subtle hover:bg-bg-hover text-xs text-text-muted hover:text-foreground transition-colors"
-                >
-                  <span className="hidden sm:inline">Buka Tab Baru</span>
-                  <span className="sm:hidden">Tab Baru</span>
-                </a>
-              </div>
-              <button onClick={() => setViewerOpen(false)} className="text-xs text-text-muted hover:text-foreground px-2 py-1 rounded transition-colors">
-                Tutup
-              </button>
-            </div>
-
-            {/* Viewer toolbar */}
-            <div className="flex items-center gap-4 px-4 py-2 border-b border-border-subtle bg-background text-xs text-text-subtle">
-              <div className="flex items-center gap-2">
-                <span>Halaman</span>
-                <input type="text" readOnly value={viewerDoc.page} className="w-8 text-center bg-bg-hover border border-border-subtle rounded py-0.5 text-xs text-foreground" />
-              </div>
-              <div className="w-px h-3 bg-border-subtle" />
-              <button
-                onClick={() => {
-                  setInput(`Jelaskan lebih lanjut bagian pada halaman ${viewerDoc.page} mengenai: "${viewerDoc.snippet.slice(0, 50)}..."`)
-                  setViewerOpen(false)
-                }}
-                className="ml-auto px-3 py-1 rounded border border-border-subtle hover:bg-bg-hover text-foreground font-medium text-xs transition-colors"
-              >
-                Tanya AI tentang bagian ini
-              </button>
-            </div>
-
-            {/* Page Content / Actual PDF iframe */}
-            <div className="flex-1 bg-background flex flex-col">
-              {viewerDoc.name.toLowerCase().endsWith('.pdf') ? (
-                <div className="flex-1 w-full flex flex-col">
-                  {/* Mobile Tip Banner */}
-                  <div className="block sm:hidden border-b border-border-subtle px-4 py-2 text-[11px] text-text-muted text-center">
-                    Catatan: Gunakan <strong>"Buka Tab Baru"</strong> jika pratinjau dokumen tidak memuat di peramban seluler.
-                  </div>
-                  <iframe
-                    src={`/api/documents/${viewerDoc.id}/download?token=${encodeURIComponent(token || '')}#page=${viewerDoc.page}`}
-                    className="flex-1 w-full border-none"
-                    title={viewerDoc.name}
-                  />
-                </div>
-              ) : (
-                <div className="flex-1 overflow-y-auto p-6 bg-background bg-dot-pattern flex items-center justify-center">
-                  <div className="w-full max-w-xl bg-bg-input border border-border-strong rounded-xl p-8 shadow-lg text-xs leading-relaxed text-text-subtle min-h-[50vh] flex flex-col justify-between">
-                    <div>
-                      <div className="text-[10px] text-text-muted uppercase tracking-wider mb-6 border-b border-border-subtle pb-2 flex justify-between">
-                        <span>Document Snippet</span>
-                        <span>CONFIDENTIAL</span>
-                      </div>
-                      <p className="mb-4 text-foreground bg-indigo-500/10 border-l-2 border-indigo-500 p-3 italic rounded-r-lg">
-                        "...{viewerDoc.snippet}..."
-                      </p>
-                    </div>
-                    <div className="text-center text-[10px] text-text-muted mt-6 border-t border-border-subtle/60 pt-3">
-                      Document ID: {viewerDoc.id}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 ${
+          viewerMode === 'split' ? 'lg:hidden' : ''
+        }`}>
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm animate-fade-in"
+            onClick={() => {
+              setViewerOpen(false)
+              setActiveCitationNum(null)
+            }}
+          />
+          <div className="relative z-10 w-full lg:max-w-6xl h-[100dvh] sm:h-[90vh] rounded-none sm:rounded-2xl border-0 sm:border border-border-strong bg-bg-panel shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+            <DocumentProofStudio
+              doc={viewerDoc}
+              mode={viewerMode}
+              token={token}
+              onClose={() => {
+                setViewerOpen(false)
+                setActiveCitationNum(null)
+              }}
+              onToggleMode={() => setViewerMode(m => m === 'split' ? 'fullscreen' : 'split')}
+              onAskAi={(prompt) => {
+                setInput(prompt)
+                if (viewerMode === 'fullscreen') setViewerMode('split')
+                setViewerOpen(false)
+                inputRef.current?.focus()
+              }}
+              onPageChange={(newPage) => {
+                setViewerDoc(prev => prev ? { ...prev, page: newPage } : null)
+              }}
+            />
           </div>
         </div>
       )}
