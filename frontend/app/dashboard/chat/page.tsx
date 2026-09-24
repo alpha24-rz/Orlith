@@ -10,9 +10,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Check, Copy } from 'lucide-react'
 import { BorderBeam } from 'border-beam'
 import { ThinkingOrb } from 'thinking-orbs'
 
@@ -327,6 +329,8 @@ function processCitationsInNode(
 // ─── Standalone CodeBlock Component ──────────────────────────────────────────
 function CodeBlock({ language, codeString, props }: { language: string; codeString: string; props: any }) {
   const [isCopied, setIsCopied] = useState(false)
+  const lineCount = codeString.split('\n').length
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(codeString)
     setIsCopied(true)
@@ -334,16 +338,35 @@ function CodeBlock({ language, codeString, props }: { language: string; codeStri
   }
 
   return (
-    <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#121316]">
-      <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-border-subtle text-[11px] font-mono text-text-muted">
-        <span className="uppercase font-medium text-text-subtle">
-          {language || 'code'}
-        </span>
+    <div className="relative group/code my-4 rounded-xl overflow-hidden border border-border-strong bg-[#0d0e12] shadow-md shadow-black/20">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-black/60 border-b border-border-subtle/70 text-[11px] font-mono text-text-muted select-none">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500/70 inline-block"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500/70 inline-block"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/70 inline-block"></span>
+          <span className="ml-1.5 uppercase font-semibold text-text-subtle tracking-wider text-[10.5px]">
+            {language || 'code'}
+          </span>
+          <span className="text-[10px] text-text-muted/70">
+            • {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+          </span>
+        </div>
         <button
           onClick={handleCopyCode}
-          className="text-[11px] text-text-subtle hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-white/10 cursor-pointer"
+          className="flex items-center gap-1.5 text-[11px] text-text-subtle hover:text-foreground transition-all px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/5 cursor-pointer"
+          title="Salin kode ke clipboard"
         >
-          {isCopied ? 'Tersalin' : 'Salin'}
+          {isCopied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400 font-medium">Tersalin</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              <span>Salin</span>
+            </>
+          )}
         </button>
       </div>
       <div className="text-[13px] overflow-x-auto leading-relaxed">
@@ -352,7 +375,19 @@ function CodeBlock({ language, codeString, props }: { language: string; codeStri
           style={vscDarkPlus}
           language={language || 'text'}
           PreTag="div"
-          customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
+          showLineNumbers={lineCount > 3}
+          customStyle={{
+            margin: 0,
+            padding: '1rem',
+            background: 'transparent',
+            fontSize: '12.5px',
+          }}
+          lineNumberStyle={{
+            minWidth: '2.5em',
+            paddingRight: '1em',
+            color: '#4b5563',
+            userSelect: 'none',
+          }}
         >
           {codeString}
         </SyntaxHighlighter>
@@ -360,6 +395,7 @@ function CodeBlock({ language, codeString, props }: { language: string; codeStri
     </div>
   )
 }
+
 
 interface ChatBubbleProps {
   message: ChatMessage
@@ -488,21 +524,57 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
         {processCitationsInNode(children, citations, handleCitationClick)}
       </li>
     ),
+    table: ({ children }) => (
+      <div className="markdown-table-wrapper">
+        <table className="markdown-table">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead>{children}</thead>,
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr>{children}</tr>,
+    th: ({ children }) => <th>{children}</th>,
     td: ({ children }) => (
-      <td className="px-4 py-3 border-b border-border-subtle/50">
+      <td>
         {processCitationsInNode(children, citations, handleCitationClick)}
       </td>
     ),
+    h1: ({ children }) => (
+      <h1 className="text-xl font-bold text-foreground mt-6 mb-3 pb-2 border-b border-border-subtle tracking-tight">
+        {children}
+      </h1>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-lg font-bold text-foreground mt-5 mb-2.5 pb-1 border-b border-border-subtle/50 tracking-tight">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-base font-semibold text-foreground mt-4 mb-2">
+        {children}
+      </h3>
+    ),
+    h4: ({ children }) => (
+      <h4 className="text-sm font-semibold text-foreground mt-3 mb-1.5">
+        {children}
+      </h4>
+    ),
+    blockquote: ({ children }) => (
+      <blockquote className="my-3 pl-4 border-l-4 border-indigo-500/70 bg-indigo-500/5 py-2.5 pr-3 rounded-r-lg italic text-text-subtle text-sm">
+        {children}
+      </blockquote>
+    ),
+    hr: () => <hr className="my-5 border-border-subtle/70" />,
     code({ node, inline, className, children, ...props }: any) {
       const match = /language-(\w+)/.exec(className || '')
       const language = match ? match[1] : ''
       const codeString = String(children).replace(/\n$/, '')
+      const isMultiLine = codeString.includes('\n')
       
-      if (!inline && match) {
-        return <CodeBlock language={language} codeString={codeString} props={props} />
+      if (!inline && (match || isMultiLine)) {
+        return <CodeBlock language={language || 'text'} codeString={codeString} props={props} />
       }
       return (
-        <code {...props} className={`${className || ''} bg-white/5 text-foreground px-1.5 py-0.5 rounded border border-border-subtle font-mono text-[12px]`}>
+        <code {...props} className={`${className || ''} bg-white/10 dark:bg-white/5 text-emerald-400 dark:text-emerald-300 px-1.5 py-0.5 rounded border border-border-subtle font-mono text-[12.5px]`}>
           {children}
         </code>
       )
@@ -521,40 +593,21 @@ function ChatBubble({ message, onOpenDoc, onEditSubmit, onRegenerate }: ChatBubb
 
       <div className="w-full min-w-0">
         <div className="text-sm text-foreground/90 leading-relaxed mb-3">
-          {hasInlineCitations ? (
-            <div className="prose prose-invert prose-sm max-w-none
-              [&_strong]:text-foreground [&_strong]:font-semibold
-              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
-              [&_th]:px-4 [&_th]:py-2.5 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
-              [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border-subtle/50
-              [&_tr:last-child_td]:border-0
-              [&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
-            ">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={renderers}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-          ) : (
-            <div className="prose prose-invert prose-sm max-w-none text-foreground/90 leading-relaxed
-              [&_strong]:text-foreground [&_strong]:font-semibold
-              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[13px] [&_table]:my-4 [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
-              [&_th]:px-4 [&_th]:py-2.5 [&_th]:bg-bg-hover/80 [&_th]:border-b [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
-              [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border-subtle/50
-              [&_tr:last-child_td]:border-0
-              [&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-text-subtle
-            ">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={renderers}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-          )}
+          <div className="prose prose-invert prose-sm max-w-none text-foreground/90 leading-relaxed
+            [&_strong]:text-foreground [&_strong]:font-semibold
+            [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2
+            [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2
+          ">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={renderers}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
         </div>
+
 
         {/* Active citation detail panel */}
         {activeCitation && (
@@ -863,7 +916,12 @@ function ResearchReportModal({
             [&_th]:px-3 [&_th]:py-2 [&_th]:bg-bg-hover [&_th]:border [&_th]:border-border-strong [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground
             [&_td]:px-3 [&_td]:py-2 [&_td]:border [&_td]:border-border-strong
           ">
-            <ReactMarkdown>{report}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {report}
+            </ReactMarkdown>
           </div>
         </div>
 
@@ -896,11 +954,12 @@ function ChatPageInner() {
   const chatId = searchParams.get('id')
 
   const { activeWorkspace, updateAiSettings } = useWorkspaceStore()
-  const { conversations, fetchConversations, addConversation } = useChatStore()
+  const { conversations, fetchConversations, addConversation, updateConversationId } = useChatStore()
   const user = useAuthStore(state => state.user)
   const token = useAuthStore(state => state.token)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+  const loadedThreadIdRef = useRef<string | null>(null)
   const [loadingThread, setLoadingThread] = useState(false)
   const messagesCache = useRef<Record<string, ChatMessage[]>>({})
   const [input, setInput] = useState('')
@@ -1046,19 +1105,22 @@ function ChatPageInner() {
   }, [messages, streamingText])
 
   const selectThread = useCallback(async (conversationId: string) => {
+    if (!conversationId) return
+    loadedThreadIdRef.current = conversationId
     setActiveConversationId(conversationId)
     
-    // Instant optimistic render from local cache
-    if (messagesCache.current[conversationId]) {
+    // Instant optimistic render from local cache if available
+    if (messagesCache.current[conversationId] && messagesCache.current[conversationId].length > 0) {
       setMessages(messagesCache.current[conversationId])
       setLoadingThread(false)
     } else {
-      setMessages([])
       setLoadingThread(true)
     }
 
     if (conversationId.startsWith('temp_')) {
-      setMessages([])
+      if (!messagesCache.current[conversationId] || messagesCache.current[conversationId].length === 0) {
+        setMessages([])
+      }
       setLoadingThread(false)
       return
     }
@@ -1068,10 +1130,14 @@ function ChatPageInner() {
       const token = localStorage.getItem('auth_token')
       if (token) headers['Authorization'] = `Bearer ${token}`
 
-      const res = await fetch(`/api/conversations/${conversationId}/messages`, { headers })
+      const res = await fetch(`/api/conversations/${conversationId}/messages`, { 
+        headers,
+        credentials: 'include'
+      })
       if (res.ok) {
         const data = await res.json()
-        const mappedMessages: ChatMessage[] = (data.messages || []).map((m: any) => ({
+        const rawMessages = data.messages || []
+        const mappedMessages: ChatMessage[] = rawMessages.map((m: any) => ({
           id: m.id,
           role: m.role,
           content: m.content,
@@ -1085,6 +1151,8 @@ function ChatPageInner() {
         }))
         messagesCache.current[conversationId] = mappedMessages
         setMessages(mappedMessages)
+      } else {
+        console.warn(`Failed to fetch messages for conversation ${conversationId}, status: ${res.status}`)
       }
     } catch (err) {
       console.error('Failed to load messages', err)
@@ -1095,15 +1163,20 @@ function ChatPageInner() {
 
   useEffect(() => {
     if (chatId) {
-      if (chatId !== activeConversationId) {
+      if (chatId !== loadedThreadIdRef.current || messages.length === 0) {
         selectThread(chatId)
       }
     } else {
-      setActiveConversationId(null)
-      setMessages([])
-      setLoadingThread(false)
+      // User navigated to /dashboard/chat (New Chat)
+      if (loadedThreadIdRef.current !== null && !loading) {
+        loadedThreadIdRef.current = null
+        setActiveConversationId(null)
+        setMessages([])
+        setStreamingText('')
+        setLoadingThread(false)
+      }
     }
-  }, [chatId, activeConversationId, selectThread])
+  }, [chatId, selectThread, loading, messages.length])
 
   // Removed handleNewChat and deleteConversation as they are in SideBar now
 
@@ -1119,10 +1192,11 @@ function ChatPageInner() {
     }
 
     const currentConvId = activeConversationId
+    let tempId: string | null = null
 
     // Optimistic UI for new conversation
     if (!currentConvId) {
-      const tempId = `temp_${Date.now()}`
+      tempId = `temp_${Date.now()}`
       const newConv = {
         id: tempId,
         title: currentInput.length > 30 ? currentInput.substring(0, 30) + '...' : currentInput,
@@ -1131,9 +1205,8 @@ function ChatPageInner() {
         workspace_id: activeWorkspace?.id || ''
       }
       addConversation(newConv)
+      loadedThreadIdRef.current = tempId
       setActiveConversationId(tempId)
-      // replace state URL to attach ?id=tempId smoothly
-      window.history.replaceState(null, '', `/dashboard/chat?id=${tempId}`)
     }
 
     let finalConvId = currentConvId
@@ -1143,7 +1216,13 @@ function ChatPageInner() {
       content: currentInput,
       timestamp: new Date(),
     }
-    setMessages(p => [...(overrideHistory || p), userMsg])
+    const nextMessages = [...(overrideHistory || messages), userMsg]
+    setMessages(nextMessages)
+    if (tempId) {
+      messagesCache.current[tempId] = nextMessages
+    } else if (currentConvId) {
+      messagesCache.current[currentConvId] = nextMessages
+    }
     setInput('')
     setLoading(true)
     setStreamingText('')
@@ -1160,6 +1239,7 @@ function ChatPageInner() {
       const res = await fetch('/api/query', {
         method: 'POST',
         headers: headers,
+        credentials: 'include',
         body: JSON.stringify({
           workspace_id: activeWorkspace?.id || '',
           message: currentInput,
@@ -1208,10 +1288,13 @@ function ChatPageInner() {
                   if (parsed.meta.retrieval_score !== undefined) retrievalScore = parsed.meta.retrieval_score
                   if (parsed.meta.conversation_id) {
                     finalConvId = parsed.meta.conversation_id
-                    if (!currentConvId) {
-                      setActiveConversationId(parsed.meta.conversation_id)
-                      window.history.replaceState(null, '', `/dashboard/chat?id=${parsed.meta.conversation_id}`)
+                    loadedThreadIdRef.current = parsed.meta.conversation_id
+                    setActiveConversationId(parsed.meta.conversation_id)
+                    if (tempId) {
+                      updateConversationId(tempId, parsed.meta.conversation_id)
+                      messagesCache.current[parsed.meta.conversation_id] = messagesCache.current[tempId] || nextMessages
                     }
+                    router.replace(`/dashboard/chat?id=${parsed.meta.conversation_id}`, { scroll: false })
                   }
                 }
               } catch (e) { /* ignore */ }
@@ -1232,7 +1315,14 @@ function ChatPageInner() {
         source_mode: sourceMode,
         retrieval_score: retrievalScore,
       }
-      setMessages(p => [...p, aiMsg])
+      setMessages(p => {
+        const full = [...p, aiMsg]
+        const cid = finalConvId || currentConvId
+        if (cid) {
+          messagesCache.current[cid] = full
+        }
+        return full
+      })
     } catch (error) {
       console.error('SSE Error:', error)
       const fallbackMsg: ChatMessage = {
@@ -1254,35 +1344,39 @@ function ChatPageInner() {
           const headers: HeadersInit = {}
           const token = localStorage.getItem('auth_token')
           if (token) headers['Authorization'] = `Bearer ${token}`
-          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
-            if (convRes.ok) {
-              const data = await convRes.json()
-              if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-                const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
-                  id: m.id,
-                  role: m.role,
-                  content: m.content,
-                  timestamp: new Date(m.created_at),
-                  citations: m.citations || m.metadata_json?.citations,
-                  confidence: m.confidence ?? m.metadata_json?.confidence,
-                  model: m.model || m.metadata_json?.model,
-                  queriesUsed: m.metadata_json?.queriesUsed,
-                  source_mode: m.metadata_json?.source_mode,
-                  retrieval_score: m.metadata_json?.retrieval_score,
-                }))
-                setMessages(prev => {
-                  const hasAssistantInMapped = mappedMessages.some(m => m.role === 'assistant')
-                  const hasAssistantInPrev = prev.some(m => m.role === 'assistant')
-                  if (!hasAssistantInMapped && hasAssistantInPrev) {
-                    return prev
-                  }
-                  return mappedMessages
-                })
-              }
+          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { 
+            headers,
+            credentials: 'include'
+          })
+          if (convRes.ok) {
+            const data = await convRes.json()
+            if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+              const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: new Date(m.created_at),
+                citations: m.citations || m.metadata_json?.citations,
+                confidence: m.confidence ?? m.metadata_json?.confidence,
+                model: m.model || m.metadata_json?.model,
+                queriesUsed: m.metadata_json?.queriesUsed,
+                source_mode: m.metadata_json?.source_mode,
+                retrieval_score: m.metadata_json?.retrieval_score,
+              }))
+              setMessages(prev => {
+                const hasAssistantInMapped = mappedMessages.some(m => m.role === 'assistant')
+                const hasAssistantInPrev = prev.some(m => m.role === 'assistant')
+                if (!hasAssistantInMapped && hasAssistantInPrev) {
+                  return prev
+                }
+                messagesCache.current[targetId] = mappedMessages
+                return mappedMessages
+              })
             }
-          } catch (e) {
-            console.error("Failed to refresh messages", e)
           }
+        } catch (e) {
+          console.error("Failed to refresh messages", e)
+        }
       }
     }
   }
@@ -1294,10 +1388,11 @@ function ChatPageInner() {
     if (!currentInput) return
 
     const currentConvId = activeConversationId
+    let tempId: string | null = null
 
     // Optimistic UI for new conversation
     if (!currentConvId) {
-      const tempId = `temp_${Date.now()}`
+      tempId = `temp_${Date.now()}`
       const newConv = {
         id: tempId,
         title: currentInput.length > 30 ? currentInput.substring(0, 30) + '...' : currentInput,
@@ -1306,8 +1401,8 @@ function ChatPageInner() {
         workspace_id: activeWorkspace?.id || ''
       }
       addConversation(newConv)
+      loadedThreadIdRef.current = tempId
       setActiveConversationId(tempId)
-      window.history.replaceState(null, '', `/dashboard/chat?id=${tempId}`)
     }
 
     let finalConvId = currentConvId
@@ -1317,7 +1412,13 @@ function ChatPageInner() {
       content: currentInput,
       timestamp: new Date(),
     }
-    setMessages(p => [...(overrideHistory || p), userMsg])
+    const nextMessages = [...(overrideHistory || messages), userMsg]
+    setMessages(nextMessages)
+    if (tempId) {
+      messagesCache.current[tempId] = nextMessages
+    } else if (currentConvId) {
+      messagesCache.current[currentConvId] = nextMessages
+    }
     setInput('')
     setLoading(true)
     setAgentRunning(true)
@@ -1336,6 +1437,7 @@ function ChatPageInner() {
       const res = await fetch('/api/agent/run', {
         method: 'POST',
         headers: headers,
+        credentials: 'include',
         body: JSON.stringify({
           workspace_id: activeWorkspace?.id || '',
           message: currentInput,
@@ -1403,10 +1505,13 @@ function ChatPageInner() {
                 ])
                 if (evt.conversation_id) {
                   finalConvId = evt.conversation_id
-                  if (!currentConvId) {
-                    setActiveConversationId(evt.conversation_id)
-                    window.history.replaceState(null, '', `/dashboard/chat?id=${evt.conversation_id}`)
+                  loadedThreadIdRef.current = evt.conversation_id
+                  setActiveConversationId(evt.conversation_id)
+                  if (tempId) {
+                    updateConversationId(tempId, evt.conversation_id)
+                    messagesCache.current[evt.conversation_id] = messagesCache.current[tempId] || nextMessages
                   }
+                  router.replace(`/dashboard/chat?id=${evt.conversation_id}`, { scroll: false })
                 }
               } else if (event === 'answer') {
                 accumulatedAnswer += evt.text || ''
@@ -1431,7 +1536,14 @@ function ChatPageInner() {
         timestamp: new Date(),
         model: `${selectedModel?.name || 'Model'} (Agent • ${totalSteps} steps)`,
       }
-      setMessages(p => [...p, agentMsg])
+      setMessages(p => {
+        const full = [...p, agentMsg]
+        const cid = finalConvId || currentConvId
+        if (cid) {
+          messagesCache.current[cid] = full
+        }
+        return full
+      })
 
     } catch (error) {
       console.error('Agent error:', error)
@@ -1457,7 +1569,10 @@ function ChatPageInner() {
           const headers: HeadersInit = {}
           const token = localStorage.getItem('auth_token')
           if (token) headers['Authorization'] = `Bearer ${token}`
-          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { headers })
+          const convRes = await fetch(`/api/conversations/${targetId}/messages`, { 
+            headers,
+            credentials: 'include'
+          })
           if (convRes.ok) {
             const data = await convRes.json()
             if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
@@ -1479,6 +1594,7 @@ function ChatPageInner() {
                 if (!hasAssistantInMapped && hasAssistantInPrev) {
                   return prev
                 }
+                messagesCache.current[targetId] = mappedMessages
                 return mappedMessages
               })
             }
@@ -1685,10 +1801,12 @@ function ChatPageInner() {
             {/* New Conversation Button */}
             <button
               onClick={() => {
-                router.push('/dashboard/chat')
+                loadedThreadIdRef.current = null
                 setActiveConversationId(null)
                 setMessages([])
+                setStreamingText('')
                 setInput('')
+                router.push('/dashboard/chat')
               }}
               className="px-3 py-1 rounded border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-all cursor-pointer"
             >
@@ -2006,11 +2124,13 @@ function ChatPageInner() {
             <div className="p-3 border-b border-border-subtle">
               <button
                 onClick={() => {
-                  router.push('/dashboard/chat');
+                  loadedThreadIdRef.current = null;
                   setActiveConversationId(null);
                   setMessages([]);
+                  setStreamingText('');
                   setInput('');
                   setHistoryDrawerOpen(false);
+                  router.push('/dashboard/chat');
                 }}
                 className="w-full py-2 rounded-md border border-border-strong hover:bg-bg-hover text-xs font-medium text-foreground transition-all cursor-pointer"
               >
@@ -2027,7 +2147,7 @@ function ChatPageInner() {
                   <button
                     key={conv.id}
                     onClick={() => {
-                      window.history.pushState(null, '', `/dashboard/chat?id=${conv.id}`);
+                      router.push(`/dashboard/chat?id=${conv.id}`);
                       selectThread(conv.id);
                       setHistoryDrawerOpen(false);
                     }}

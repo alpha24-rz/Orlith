@@ -1,4 +1,11 @@
-import pytest
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
 from services.chunking import split_pages_hierarchical, add_window_parent_context
 
 def test_split_pages_hierarchical():
@@ -42,3 +49,12 @@ def test_add_window_parent_context():
     
     # Third chunk parent should be Chunk 2 + Chunk 3
     assert result[2]["parent_content"] == "Chunk 2 content.\n\nChunk 3 content."
+
+
+if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    test_split_pages_hierarchical()
+    test_add_window_parent_context()
+    print("test_parent_child_chunking PASSED [OK]")

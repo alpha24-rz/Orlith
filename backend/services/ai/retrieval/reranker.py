@@ -12,8 +12,10 @@ def get_cross_encoder(model_name: str):
     """
     try:
         from sentence_transformers import CrossEncoder
-        logger.info(f"Loading cross-encoder model: {model_name}")
-        model = CrossEncoder(model_name)
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Loading cross-encoder model on {device.upper()}: {model_name}")
+        model = CrossEncoder(model_name, device=device)
         return model
     except ImportError:
         logger.error("sentence-transformers not installed. Reranker unavailable.")
@@ -37,9 +39,14 @@ def _do_rerank(query: str, candidates: List[Dict], model_name: str) -> List[Dict
     
     # Create a new list to avoid mutating the input candidates across thread boundaries
     reranked_candidates = []
+    import math
     for i, score in enumerate(scores):
         new_candidate = candidates[i].copy()
-        new_candidate["rerank_score"] = float(score)
+        raw_score = float(score)
+        new_candidate["rerank_score"] = raw_score
+        # Calibrate logit to [0, 1] probability via sigmoid
+        calibrated = 1.0 / (1.0 + math.exp(-raw_score))
+        new_candidate["relevance_score"] = round(calibrated, 4)
         reranked_candidates.append(new_candidate)
         
     # Sort descending by rerank_score

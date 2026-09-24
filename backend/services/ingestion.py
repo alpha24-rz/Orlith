@@ -22,16 +22,6 @@ logger = logging.getLogger(__name__)
 
 _ingestion_semaphore = asyncio.Semaphore(settings.INGESTION_CONCURRENCY)
 
-_easyocr_reader = None
-
-def get_easyocr_reader():
-    global _easyocr_reader
-    if _easyocr_reader is None:
-        cuda_available = torch.cuda.is_available()
-        logger.info(f"Initializing EasyOCR reader (en, id) on {'GPU (CUDA)' if cuda_available else 'CPU'}...")
-        _easyocr_reader = easyocr.Reader(['en', 'id'], gpu=cuda_available)
-    return _easyocr_reader
-
 
 def get_file_hash(file_path: str) -> str:
     """Compute SHA-256 hash of a file."""
@@ -46,126 +36,15 @@ def extract_text_from_file(
     file_path: str, file_type: str, ocr: bool = False
 ) -> tuple[list[dict], dict]:
     """
-    Extracts text from various file formats.
+    Extracts text from various file formats (TXT, MD, DOCX, PDF, Images).
+    Delegates to TextExtractionService for unified SOTA extraction and Baidu/EasyOCR.
     Returns: (list_of_pages, metadata_dict)
     where list_of_pages = [{"text": str, "page_number": int}]
     """
-    file_path_lower = file_path.lower()
-    metadata = {"ocr_applied": False, "page_count": 1}
-    pages_data = []
+    from services.text_extraction import TextExtractionService
+    extractor = TextExtractionService()
+    return extractor._extract_sync(file_path, file_type, ocr)
 
-    # TXT / MD Files
-    if (
-        file_path_lower.endswith(".txt")
-        or file_path_lower.endswith(".md")
-        or file_type in ("text/plain", "text/markdown")
-    ):
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            text_content = f.read()
-        pages_data.append({"text": text_content, "page_number": 1})
-        metadata["page_count"] = 1
-
-    # Word (DOCX) Files
-    elif (
-        file_path_lower.endswith(".docx")
-        or file_type
-        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ):
-        try:
-            doc = docx.Document(file_path)
-            text_parts = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text:
-                    text_parts.append(paragraph.text)
-
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        if cell.text:
-                            text_parts.append(cell.text)
-
-            text_content = "\n".join(text_parts)
-            pages_data.append({"text": text_content, "page_number": 1})
-            metadata["page_count"] = len(doc.paragraphs)
-        except Exception as docx_err:
-            logger.warning(f"python-docx parsing failed: {docx_err}. Attempting raw XML zip fallback...")
-            try:
-                import zipfile
-                import xml.etree.ElementTree as ET
-                
-                with zipfile.ZipFile(file_path) as docx_zip:
-                    xml_content = docx_zip.read('word/document.xml')
-                
-                root = ET.fromstring(xml_content)
-                text_parts = []
-                for elem in root.iter():
-                    if elem.tag.endswith('}t') and elem.text:
-                        text_parts.append(elem.text)
-                
-                text_content = " ".join(text_parts)
-                if not text_content.strip():
-                    raise ValueError("No text extracted from word/document.xml")
-                
-                pages_data.append({"text": text_content, "page_number": 1})
-                metadata["page_count"] = 1
-                logger.info("Raw XML zip fallback successfully extracted text from DOCX.")
-            except Exception as fallback_err:
-                raise RuntimeError(
-                    f"Word (DOCX) text extraction failed. python-docx error: {docx_err}. "
-                    f"XML zip fallback error: {fallback_err}"
-                )
-
-    # PDF Files
-    elif file_path_lower.endswith(".pdf") or file_type == "application/pdf":
-        page_count = 0
-        total_text = ""
-        try:
-            with pdfplumber.open(file_path) as pdf:
-                page_count = len(pdf.pages)
-                for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text()
-                    if page_text:
-                        pages_data.append({"text": page_text, "page_number": i + 1})
-                        total_text += page_text
-        except Exception as e:
-            logger.warning(
-                f"pdfplumber text extraction failed, falling back to OCR if available. Error: {e}"
-            )
-
-        metadata["page_count"] = page_count
-
-        # Check if we should apply OCR
-        if ocr or len(total_text.strip()) < 50:
-            logger.info(
-                "PDF has very little text or OCR was explicitly requested. Attempting OCR..."
-            )
-
-            try:
-                pages_data.clear()  # clear whatever we got from pdfplumber
-                pdf_doc = pdfium.PdfDocument(file_path)
-                page_count = len(pdf_doc)
-                metadata["page_count"] = page_count
-
-                reader = get_easyocr_reader()
-
-                for i, page in enumerate(pdf_doc):
-                    image = page.render(scale=2).to_pil()
-                    image_np = np.array(image)
-                    results = reader.readtext(image_np, detail=0)
-                    page_text = "\n".join(results)
-                    if page_text:
-                        pages_data.append({"text": page_text, "page_number": i + 1})
-
-                metadata["ocr_applied"] = True
-            except Exception as e:
-                raise RuntimeError(f"OCR processing failed: {str(e)}")
-
-    else:
-        raise ValueError(
-            f"Unsupported file format: {file_type} or file extension for {file_path}"
-        )
-
-    return pages_data, metadata
 
 
 async def broadcast_status(document: Document, db: AsyncSession, error_msg: str = None):

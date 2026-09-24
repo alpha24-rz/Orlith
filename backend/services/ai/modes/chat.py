@@ -67,19 +67,23 @@ class StandardChatMode(BaseReasoningMode):
 
         try:
             # Configure Retrieval Layer dynamically
+            # Configure Retrieval Layer dynamically (SOTA RAG 2.0)
             from core.config import settings
             from services.ai.retrieval.config import RetrievalConfig
             retrieval_config = RetrievalConfig(
                 enable_hybrid_search=settings.ENABLE_HYBRID_SEARCH,
                 enable_reranker=settings.ENABLE_RERANKER,
+                enable_hyde=settings.ENABLE_HYDE,
+                enable_chunk_stitching=settings.ENABLE_CHUNK_STITCHING,
                 candidate_pool_size=settings.RAG_CANDIDATE_POOL_SIZE,
                 final_top_k=settings.RAG_FINAL_TOP_K,
+                vector_distance_cutoff=settings.VECTOR_SEARCH_DISTANCE_CUTOFF,
                 bm25_top_k=settings.BM25_TOP_K,
                 rrf_k=settings.RRF_K,
                 reranker_model=settings.RERANKER_MODEL
             )
 
-            # 1. Retrieval Layer
+            # 1. Retrieval Layer (Dense + Sparse BM25 + Multi-Query RRF + Reranker + Stitching)
             chunks = await retrieve_relevant_chunks(
                 workspace_id=workspace_id,
                 query=query,
@@ -91,24 +95,14 @@ class StandardChatMode(BaseReasoningMode):
             )
 
             # Relevance Gate
+            from services.ai.postprocess.citations import calculate_calibrated_relevance
             relevance_threshold = settings.RAG_SIMILARITY_THRESHOLD
             top_score = 0.0
             valid_chunks = []
-            for chunk in chunks:
-                score = 0.0
-                if "relevance_score" in chunk:
-                    score = chunk["relevance_score"]
-                elif "rerank_score" in chunk:
-                    import math
-                    score = 1.0 / (1.0 + math.exp(-chunk["rerank_score"]))
-                elif "reranker_score" in chunk:
-                    import math
-                    score = 1.0 / (1.0 + math.exp(-chunk["reranker_score"]))
-                elif "rrf_score" in chunk:
-                    score = max(0.0, min(1.0, chunk["rrf_score"] * 30))
-                elif "distance" in chunk:
-                    score = max(0.0, min(1.0, 1.0 - chunk["distance"]))
 
+            for chunk in chunks:
+                score = calculate_calibrated_relevance(chunk)
+                chunk["relevance_score"] = score
                 if score > top_score:
                     top_score = score
                 
@@ -123,9 +117,9 @@ class StandardChatMode(BaseReasoningMode):
                 source_mode = "HYBRID"
             else:
                 source_mode = "GENERAL"
-                valid_chunks = [] # Force general knowledge
+                valid_chunks = [] # Fallback to general knowledge
 
-            # 2. Build Citations
+            # 2. Build Citations & Rich Context (Injecting parent_content for LLM)
             from services.ai.postprocess import generate_citations, format_sse_meta, format_sse_text, format_llm_error_message
             valid_chunks_text, citations = generate_citations(valid_chunks)
 
@@ -134,7 +128,7 @@ class StandardChatMode(BaseReasoningMode):
                 "citations": citations,
                 "model": chat_model,
                 "confidence": round(top_score, 2),
-                "queriesUsed": 1 if not enable_rewriting else 3,
+                "queriesUsed": 1 if not enable_rewriting else (4 if settings.ENABLE_HYDE else 3),
                 "conversation_id": conversation_id,
                 "source_mode": source_mode,
                 "retrieval_score": round(top_score, 4)
@@ -147,20 +141,38 @@ class StandardChatMode(BaseReasoningMode):
                 else "Tidak ada dokumen relevan."
             )
 
-            # 3. Assemble Unified System Prompt
+            # 3. Assemble Unified Grounded System Prompt
             system_prompt = (
-                "Kamu adalah DocuMind AI, asisten AI untuk workspace dokumen.\n\n"
+                "Kamu adalah ORLITH AI, asisten AI cerdas untuk analisis dokumen perusahaan (Corporate Brain).\n\n"
                 "ATURAN PRIORITAS (WAJIB DIIKUTI):\n"
-                "1. Jika tersedia KONTEKS DOKUMEN yang relevan, gunakan itu sebagai sumber utama jawaban.\n"
-                "2. Jika jawaban berasal dari dokumen, sertakan citation seperti [1] atau [2].\n"
-                "3. Jika dokumen tidak relevan (kosong) atau pertanyaan bersifat umum (sapaan, chit-chat, pengetahuan publik), jawab secara natural menggunakan pengetahuan umum.\n"
-                "4. Jika menjawab dari pengetahuan umum, tambahkan SATU disclaimer singkat di awal jawaban: \"Berdasarkan pengetahuan umum saya (karena tidak ditemukan informasi relevan di dokumen)...\"\n"
-                "5. Jangan mengarang isi dokumen. Jika dokumen tampak relevan tetapi tidak cukup untuk menjawab, katakan bahwa informasinya tidak ditemukan secara eksplisit.\n\n"
-                "ATURAN FORMATTING (WAJIB DIIKUTI):\n"
-                "1. Gunakan Markdown secara ekstensif agar jawaban mudah dibaca.\n"
-                "2. Jika data terstruktur (perbandingan, dll), gunakan Markdown Table.\n"
-                "3. Gunakan fenced code blocks untuk kode (```language ... ```), tetapi JANGAN bungkus seluruh jawaban dalam satu blok kode.\n"
-                "4. Gunakan bullet points atau daftar bernomor jika diperlukan.\n\n"
+                "1. Jika tersedia KONTEKS DOKUMEN di bawah, jadikan itu sebagai rujukan utama kebenaran jawaban.\n"
+                "2. Setiap klaim, fakta, angka, atau pernyataan yang diambil dari dokumen WAJIB disertai nomor sitasi seperti [1], [2] sesuai urutan dokumen di konteks.\n"
+                "3. Jelaskan jawaban secara komprehensif, runtut, dan langsung menjawab inti pertanyaan.\n"
+                "4. Jika informasi pada dokumen hanya menjawab sebagian pertanyaan, jawab bagian yang ada disertai sitasi dan nyatakan dengan jujur bagian mana yang tidak tertulis di dokumen.\n"
+                "5. Jika dokumen sama sekali tidak relevan atau kosong, jawab menggunakan pengetahuan umummu dengan memberikan catatan singkat: 'Berdasarkan pengetahuan umum (karena tidak ditemukan rincian di dokumen)...'.\n"
+                "6. JANGAN mengarang (halusinasi) pasal, klausul, nama pihak, atau angka yang tidak terdapat dalam teks dokumen.\n\n"
+                "STANDAR FORMAT OUTPUT (SANGAT PENTING - WAJIB PATUH):\n"
+                "- RUMUS MATEMATIKA / PERSAMAAN / SAINS:\n"
+                "  * Wajib gunakan format LaTeX standar.\n"
+                "  * Untuk rumus dalam kalimat (inline), apit dengan tanda satu dollar, contoh: $E = mc^2$ atau $\\mu = \\frac{1}{N}\\sum_{i=1}^N x_i$.\n"
+                "  * Untuk rumus mandiri / blok terpisah (display block), apit dengan tanda dua dollar pada baris baru terpisah, contoh:\n"
+                "    $$\n"
+                "    \\sigma = \\sqrt{\\frac{1}{N} \\sum_{i=1}^{N} (x_i - \\mu)^2}\n"
+                "    $$\n"
+                "  * JANGAN gunakan teks polos ASCII untuk rumus (hindari 'sum_(i=1)^N' tanpa LaTeX).\n\n"
+                "- TABEL DATA / KOMPARASI:\n"
+                "  * Sajikan data perbandingan, angka, klausul, atau parameter dalam format GitHub Flavored Markdown (GFM) Table yang rapi.\n"
+                "  * Wajib sertakan baris header dan garis pemisah kolom yang valid, contoh:\n"
+                "    | Parameter | Keterangan | Nilai |\n"
+                "    | :--- | :--- | :--- |\n"
+                "    | Akurasi | Nilai pengujian | 98.5% |\n\n"
+                "- KODE PROGRAM / SCRIPT:\n"
+                "  * Wajib gunakan fenced code blocks dengan menyebutkan nama bahasa secara eksplisit (misal: ```python, ```javascript, ```typescript, ```sql, ```bash, ```json, dll).\n"
+                "  * Berikan indentasi yang rapi dan komentar penjelasan pada baris kunci.\n\n"
+                "- STRUKTUR & KETERBACAAN:\n"
+                "  * Gunakan hierarki heading yang rapi (`###`, `####`).\n"
+                "  * Gunakan bullet points atau penomoran untuk menjelaskan langkah atau poin-poin secara sistematis.\n"
+                "  * Tuliskan sitasi dokumen secara inline di akhir klaim yang relevan, misal: '...hak cuti tahunan adalah 12 hari kerja [1].'\n\n"
                 f"STATUS RETRIEVAL: {'DOCUMENT_AVAILABLE' if valid_chunks_text else 'DOCUMENT_NOT_RELEVANT'}\n"
                 f"KONTEKS DOKUMEN:\n{context}"
             )

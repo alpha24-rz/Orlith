@@ -1,10 +1,9 @@
+from __future__ import annotations
 import logging
-from typing import AsyncIterator, List, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import AsyncIterator, List, Dict, Any, TYPE_CHECKING
 
-from services.ai.modes.chat import StandardChatMode
-from services.ai.modes.agent import AgentMode
-from services.ai.modes.research import DeepResearchMode
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +32,7 @@ class AIOrchestrator:
         
         mode_normalized = mode.lower().strip()
         if mode_normalized in ("chat", "standard", "rag"):
+            from services.ai.modes.chat import StandardChatMode
             chat_mode = StandardChatMode(self.db)
             async for chunk in chat_mode.execute(
                 workspace_id=workspace_id,
@@ -47,6 +47,7 @@ class AIOrchestrator:
             ):
                 yield chunk
         elif mode_normalized == "agent":
+            from services.ai.modes.agent import AgentMode
             agent_mode = AgentMode(self.db)
             async for chunk in agent_mode.execute(
                 workspace_id=workspace_id,
@@ -62,6 +63,7 @@ class AIOrchestrator:
             ):
                 yield chunk
         elif mode_normalized in ("research", "deep_research"):
+            from services.ai.modes.research import DeepResearchMode
             research_mode = DeepResearchMode(self.db)
             async for chunk in research_mode.execute(
                 workspace_id=workspace_id,

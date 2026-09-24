@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 :root {
   /* Eye-soothing, soft anti-glare matte light palette */
@@ -118,5 +119,76 @@ body {
 
 .react-flow__controls-button:hover {
   background-color: var(--bg-hover) !important;
+}
+
+/* ==========================================================================
+   KaTeX & Mathematical Formula Rendering
+   ========================================================================== */
+.katex-display {
+  margin: 1.25rem 0 !important;
+  padding: 1rem 1.25rem !important;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.katex {
+  font-size: 1.05em;
+  color: inherit;
+}
+
+/* ==========================================================================
+   Enhanced Markdown Tables
+   ========================================================================== */
+.markdown-table-wrapper {
+  margin: 1.25rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-strong);
+  overflow-x: auto;
+  background: var(--bg-panel);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.markdown-table thead {
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.markdown-table th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.markdown-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+  opacity: 0.92;
+}
+
+.markdown-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.markdown-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.markdown-table tbody tr:last-child td {
+  border-bottom: none;
 }
 

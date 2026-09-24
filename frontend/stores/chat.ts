@@ -13,6 +13,7 @@ interface ChatState {
   loading: boolean;
   fetchConversations: (workspaceId: string) => Promise<void>;
   addConversation: (conv: Conversation) => void;
+  updateConversationId: (oldId: string, newId: string) => void;
   deleteConversation: (id: string) => Promise<boolean>;
   clearConversations: () => void;
 }
@@ -29,7 +30,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
       if (token) headers['Authorization'] = `Bearer ${token}`
 
-      const res = await fetch(`/api/conversations?workspace_id=${workspaceId}`, { headers })
+      const res = await fetch(`/api/conversations?workspace_id=${workspaceId}`, { 
+        headers,
+        credentials: 'include'
+      })
       if (res.ok) {
         const data = await res.json()
         set({ conversations: data })
@@ -43,11 +47,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   addConversation: (conv: Conversation) => {
     set((state) => {
-      // Avoid duplicate temp IDs if the actual one was just added
+      // Avoid duplicate IDs
       const exists = state.conversations.some(c => c.id === conv.id)
       if (exists) return state
       return { conversations: [conv, ...state.conversations] }
     })
+  },
+
+  updateConversationId: (oldId: string, newId: string) => {
+    set((state) => ({
+      conversations: state.conversations.map(c => 
+        c.id === oldId ? { ...c, id: newId } : c
+      )
+    }))
   },
 
   deleteConversation: async (id: string) => {
@@ -58,7 +70,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const res = await fetch(`/api/conversations/${id}`, {
         method: 'DELETE',
-        headers
+        headers,
+        credentials: 'include'
       })
       if (res.ok) {
         set((state) => ({

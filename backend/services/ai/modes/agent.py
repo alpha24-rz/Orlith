@@ -104,11 +104,12 @@ class AgentMode(BaseReasoningMode):
             "4. Sertakan citation [dokumen, halaman] di jawaban final\n"
             "5. Jika informasi tidak ditemukan setelah pencarian menyeluruh, katakan dengan jelas\n"
             "6. Jawab dalam bahasa yang sama dengan pertanyaan pengguna\n\n"
-            "ATURAN FORMATTING (WAJIB DIIKUTI):\n"
-            "1. Gunakan format Markdown secara ekstensif agar jawaban mudah dibaca.\n"
-            "2. JIKA pengguna meminta perbandingan, atau jika data mengandung struktur kolom/baris, WAJIB tampilkan jawaban dalam format Markdown Table.\n"
-            "3. JIKA memberikan contoh skrip, konfigurasi, atau data mentah, gunakan Markdown Code Blocks (```language ... ```).\n"
-            "4. Gunakan bullet points atau daftar bernomor jika menjelaskan langkah-langkah atau beberapa poin."
+            "STANDAR FORMAT OUTPUT (SANGAT PENTING - WAJIB PATUH):\n"
+            "1. RUMUS & PERSAMAAN MATEMATIKA / SAINS: Wajib gunakan LaTeX standar. Gunakan $rumus$ untuk inline math dan $$\\nrumus\\n$$ untuk display block pada baris terpisah.\n"
+            "2. TABEL DATA / KOMPARASI: JIKA pengguna meminta perbandingan, atau jika data mengandung struktur kolom/baris, WAJIB tampilkan dalam format GitHub Flavored Markdown (GFM) Table yang valid dengan header dan separator (|---|---).\n"
+            "3. KODE PROGRAM: JIKA memberikan contoh skrip, konfigurasi, atau query, WAJIB gunakan fenced code blocks dengan bahasa spesifik (```python, ```typescript, ```sql, ```bash, dll) dan indentasi rapi.\n"
+            "4. STRUKTUR: Gunakan heading terstruktur (`###`, `####`), bullet points, dan penomoran agar jawaban runtut dan profesional.\n"
+            "5. SITASI: Sertakan citation [dokumen, halaman] pada setiap fakta yang diambil dari dokumen."
         )
 
         context_manager = ContextManager(self.db)

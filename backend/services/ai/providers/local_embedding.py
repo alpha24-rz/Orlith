@@ -39,8 +39,10 @@ def _load_model(model_name: str):
             "(first use — downloading if not cached, may take a moment...)"
         )
         from sentence_transformers import SentenceTransformer
-        _model_cache[model_name] = SentenceTransformer(model_name)
-        logger.info(f"Local embedding model ready: {model_name}")
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _model_cache[model_name] = SentenceTransformer(model_name, device=device)
+        logger.info(f"Local embedding model ready on {device.upper()}: {model_name}")
     return _model_cache[model_name]
 
 

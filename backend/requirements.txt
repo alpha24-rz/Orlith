@@ -50,3 +50,9 @@ litellm
 # OCR
 easyocr
 langdetect==1.0.9
+pymupdf>=1.24.0
+einops>=0.8.0
+addict>=2.4.0
+easydict>=1.13
+transformers>=4.48.0,<5.0.0
+

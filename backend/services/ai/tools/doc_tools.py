@@ -146,42 +146,87 @@ async def search_documents(
         return {"hits": [], "message": "Query kosong."}
 
     try:
-        embeddings = await embedding_provider.embed([query], embed_model)
-        query_embedding = embeddings[0]
-    except Exception as e:
-        return {"error": f"Gagal membuat embedding: {e}"}
+        from services.ai.retrieval.search import retrieve_relevant_chunks
+        from core.config import settings
+        from services.ai.retrieval.config import RetrievalConfig
 
-    collection = get_workspace_collection(workspace.id)
-    try:
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
+        retrieval_config = RetrievalConfig(
+            enable_hybrid_search=settings.ENABLE_HYBRID_SEARCH,
+            enable_reranker=settings.ENABLE_RERANKER,
+            enable_hyde=settings.ENABLE_HYDE,
+            enable_chunk_stitching=settings.ENABLE_CHUNK_STITCHING,
+            candidate_pool_size=settings.RAG_CANDIDATE_POOL_SIZE,
+            final_top_k=top_k,
+            vector_distance_cutoff=settings.VECTOR_SEARCH_DISTANCE_CUTOFF,
+            bm25_top_k=settings.BM25_TOP_K,
+            rrf_k=settings.RRF_K,
+            reranker_model=settings.RERANKER_MODEL,
         )
-    except Exception as e:
-        return {"error": f"ChromaDB error: {e}"}
 
-    hits = []
-    if results and results.get("documents") and results["documents"]:
-        docs = results["documents"][0]
-        distances = results.get("distances", [[1.0] * len(docs)])[0]
-        metadatas = results.get("metadatas", [[{}] * len(docs)])[0]
+        chunks = await retrieve_relevant_chunks(
+            workspace_id=workspace.id,
+            query=query,
+            db=db,
+            top_k=top_k,
+            enable_rewriting=True,
+            retrieval_config=retrieval_config,
+        )
 
-        for text, distance, meta in zip(docs, distances, metadatas):
-            similarity = round(max(0.0, min(1.0, 1.0 - distance)), 3)
+        hits = []
+        for chunk in chunks:
+            meta = chunk.get("meta") or {}
+            doc_text = chunk.get("parent_content") or meta.get("parent_content") or chunk.get("text", "")
+            raw_text = chunk.get("text", "")
+            relevance = chunk.get("relevance_score", 0.75)
+
             hits.append({
                 "doc_id": meta.get("document_id", ""),
                 "filename": meta.get("filename", "Unknown"),
                 "page": meta.get("page_number", 1),
-                "relevance": similarity,
-                "text": text,
-                "excerpt": text[:400] + "..." if len(text) > 400 else text
+                "section": meta.get("section"),
+                "relevance": round(float(relevance), 3),
+                "text": doc_text,
+                "excerpt": raw_text[:400] + "..." if len(raw_text) > 400 else raw_text,
             })
 
-    return {
-        "query": query,
-        "hits_found": len(hits),
-        "hits": hits
-    }
+        return {
+            "query": query,
+            "hits_found": len(hits),
+            "hits": hits,
+        }
+
+    except Exception as e:
+        logger.warning(f"Hybrid retrieval tool error: {e}. Falling back to basic vector query.")
+        try:
+            embeddings = await embedding_provider.embed([query], embed_model)
+            query_embedding = embeddings[0]
+            collection = get_workspace_collection(workspace.id)
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+            )
+            hits = []
+            if results and results.get("documents") and results["documents"]:
+                docs = results["documents"][0]
+                distances = results.get("distances", [[1.0] * len(docs)])[0]
+                metadatas = results.get("metadatas", [[{}] * len(docs)])[0]
+                for text, distance, meta in zip(docs, distances, metadatas):
+                    similarity = round(max(0.0, min(1.0, 1.0 - distance)), 3)
+                    hits.append({
+                        "doc_id": meta.get("document_id", ""),
+                        "filename": meta.get("filename", "Unknown"),
+                        "page": meta.get("page_number", 1),
+                        "relevance": similarity,
+                        "text": text,
+                        "excerpt": text[:400] + "..." if len(text) > 400 else text
+                    })
+            return {
+                "query": query,
+                "hits_found": len(hits),
+                "hits": hits
+            }
+        except Exception as fallback_err:
+            return {"error": f"Gagal mencari dokumen: {fallback_err}"}
 
 async def list_documents(
     *,

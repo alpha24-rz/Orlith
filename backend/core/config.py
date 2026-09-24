@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 128
     RAG_CANDIDATE_POOL_SIZE: int = 30
     RAG_FINAL_TOP_K: int = 5
-    RAG_SIMILARITY_THRESHOLD: float = 0.5
+    RAG_SIMILARITY_THRESHOLD: float = 0.35
+    VECTOR_SEARCH_DISTANCE_CUTOFF: float = 0.85
     
     # Parent-Child Chunking Settings
     ENABLE_PARENT_CHILD_CHUNKING: bool = True
@@ -59,8 +60,10 @@ class Settings(BaseSettings):
     ENABLE_HYBRID_SEARCH: bool = True
     BM25_TOP_K: int = 30
     RRF_K: int = 60
-    BM25_TOP_K: int = 30
-    RRF_K: int = 60
+
+    # Advanced RAG Enhancements (SOTA RAG 2.0)
+    ENABLE_HYDE: bool = True
+    ENABLE_CHUNK_STITCHING: bool = True
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"

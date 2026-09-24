@@ -285,11 +285,14 @@ export default function SideBar({ pathname, onOpenNewWorkspace, onOpenCommandPal
                       </div>
                     </Link>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         if (confirm('Hapus percakapan ini?')) {
-                          deleteConversation(conv.id)
+                          await deleteConversation(conv.id)
+                          if (active) {
+                            window.location.href = '/dashboard/chat'
+                          }
                         }
                       }}
                       className="opacity-0 group-hover/chat:opacity-100 p-1.5 -mr-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
