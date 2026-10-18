@@ -196,6 +196,21 @@ async def health_check():
     except Exception as e:
         chroma_status = f"error: {str(e)}"
 
+    # GPU info (e.g. NVIDIA L4 on Google Colab) — informational only
+    gpu_info = None
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            free_b, total_b = torch.cuda.mem_get_info(0)
+            gpu_info = {
+                "name": torch.cuda.get_device_name(0),
+                "memory_used_gb": round((total_b - free_b) / (1024**3), 2),
+                "memory_total_gb": round(total_b / (1024**3), 2),
+            }
+    except Exception:
+        gpu_info = None
+
     return {
         "status": "healthy"
         if db_status == "connected" and chroma_status == "connected"
@@ -205,4 +220,5 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "dependencies": {"database": db_status, "chroma": chroma_status},
+        "gpu": gpu_info,
     }

@@ -16,6 +16,9 @@ def get_cross_encoder(model_name: str):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading cross-encoder model on {device.upper()}: {model_name}")
         model = CrossEncoder(model_name, device=device)
+        if device == "cuda":
+            # fp16 halves VRAM usage and speeds up reranking on GPU
+            model.model.half()
         return model
     except ImportError:
         logger.error("sentence-transformers not installed. Reranker unavailable.")

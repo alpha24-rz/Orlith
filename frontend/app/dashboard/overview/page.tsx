@@ -14,6 +14,7 @@ import { LineChart, Line, AreaChart, Area, ResponsiveContainer, Tooltip } from '
 import { DocumentUploaderModal } from '@/components/DocumentUploaderModal'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/lib/api-client'
+import { getDirectBackendUrl, getWsBase } from '@/lib/backend-url'
 
 interface Toast {
   id: string
@@ -108,13 +109,8 @@ export default function DashboardPage() {
     fetchDocuments()
     fetchStats()
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    let baseUrl = 'localhost:8000'
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('http://', '').replace('https://', '')
-    }
     const token = useAuthStore.getState().token
-    const ws = new WebSocket(`${protocol}//${baseUrl}/documents/ws/${activeWorkspaceId}${token ? `?token=${token}` : ''}`)
+    const ws = new WebSocket(`${getWsBase()}/documents/ws/${activeWorkspaceId}${token ? `?token=${token}` : ''}`)
 
     ws.onmessage = (event) => {
       try {
@@ -168,7 +164,7 @@ export default function DashboardPage() {
     }
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const baseUrl = getDirectBackendUrl()
       const res = await fetch(`${baseUrl}/documents/${id}/process`, { method: 'POST' })
       if (res.ok) {
         addToast("Re-embed Started", "Document is being processed again.", "info")

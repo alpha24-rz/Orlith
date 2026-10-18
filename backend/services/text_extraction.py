@@ -141,7 +141,13 @@ def get_baidu_ocr():
                     "/content/baidu",
                 ]
                 for p in possible_local_paths:
-                    if os.path.isdir(p) and os.path.exists(os.path.join(p, "config.json")):
+                    # Only use a local checkpoint if the weights are actually present
+                    # (the git repo tracks config/code files but not *.safetensors).
+                    if (
+                        os.path.isdir(p)
+                        and os.path.exists(os.path.join(p, "config.json"))
+                        and glob.glob(os.path.join(p, "*.safetensors"))
+                    ):
                         model_name = p
                         break
                 if not model_name:

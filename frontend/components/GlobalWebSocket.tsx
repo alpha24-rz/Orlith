@@ -4,16 +4,10 @@ import { useEffect, useRef } from 'react'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useToastStore } from '@/stores/toast'
+import { getWsBase } from '@/lib/backend-url'
 
 const getWsUrl = (token: string) => {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  let baseUrl = window.location.host
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('http://', '').replace('https://', '')
-  } else if (process.env.NODE_ENV === 'development') {
-    baseUrl = 'localhost:8000'
-  }
-  return `${protocol}//${baseUrl}/notifications/ws?token=${token}`
+  return `${getWsBase()}/notifications/ws?token=${token}`
 }
 
 export default function GlobalWebSocket() {

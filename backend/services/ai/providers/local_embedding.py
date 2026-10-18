@@ -41,7 +41,11 @@ def _load_model(model_name: str):
         from sentence_transformers import SentenceTransformer
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        _model_cache[model_name] = SentenceTransformer(model_name, device=device)
+        model = SentenceTransformer(model_name, device=device)
+        if device == "cuda":
+            # fp16 halves VRAM usage and uses tensor cores (e.g. NVIDIA L4)
+            model = model.half()
+        _model_cache[model_name] = model
         logger.info(f"Local embedding model ready on {device.upper()}: {model_name}")
     return _model_cache[model_name]
 

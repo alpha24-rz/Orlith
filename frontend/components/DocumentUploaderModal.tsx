@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react'
 import { UploadCloud, File as FileIcon, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { getDirectBackendUrl } from '@/lib/backend-url'
 
 interface DocumentUploaderModalProps {
   isOpen: boolean
@@ -94,7 +95,7 @@ export function DocumentUploaderModal({ isOpen, onClose, workspaceId, onUploadSu
 
       try {
         const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const baseUrl = getDirectBackendUrl()
         const res = await fetch(`${baseUrl}/documents/upload`, {
           method: 'POST',
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},

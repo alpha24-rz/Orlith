@@ -1,5 +1,6 @@
 'use client'
 
+import { apiUrl } from '@/lib/backend-url'
 import { useState, useRef, useEffect, useCallback, Suspense, Fragment, isValidElement, cloneElement, ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { mockDocuments } from '@/lib/mock-data'
@@ -258,7 +259,7 @@ function DocumentProofStudio({
 
   const relevancePct = doc.relevanceScore ? Math.round(doc.relevanceScore * 100) : 94
   const isPdf = doc.name.toLowerCase().endsWith('.pdf')
-  const downloadUrl = `/api/documents/${doc.id}/download?token=${encodeURIComponent(token || '')}#page=${doc.page}`
+  const downloadUrl = apiUrl(`/documents/${doc.id}/download?token=${encodeURIComponent(token || '')}#page=${doc.page}`)
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background border-l border-border-subtle relative select-none">

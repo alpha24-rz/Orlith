@@ -1,5 +1,6 @@
 fastapi[standard] >= 0.111
-sqlalchemy >= 2.0
+sqlalchemy[asyncio] >= 2.0
+greenlet >= 3.0.0
 aiosqlite                      # async SQLite driver
 alembic
 apscheduler >= 3.10            # background task scheduling

@@ -8,6 +8,7 @@ import { Document, DocumentStatus } from '@/lib/types'
 import { api } from '@/lib/api-client'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
+import { getBackendOverride, getWsBase } from '@/lib/backend-url'
 import {
   FileText, Upload, Search, Filter, MoreVertical,
   CheckCircle2, Clock, XCircle, Trash2, Download,
@@ -44,6 +45,10 @@ const getWebSocketUrl = (workspaceId: string) => {
   const token = useAuthStore.getState().token
   const query = token ? `?token=${token}` : ''
   if (typeof window !== 'undefined') {
+    // Runtime override (e.g. Colab tunnel): connect directly to the backend
+    if (getBackendOverride()) {
+      return `${getWsBase()}/documents/ws/${workspaceId}${query}`
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${protocol}//${window.location.host}/api/documents/ws/${workspaceId}${query}`
   }

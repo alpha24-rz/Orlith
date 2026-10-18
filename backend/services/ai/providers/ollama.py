@@ -1,10 +1,15 @@
 from .base import ILLMProvider, IEmbeddingProvider
 from typing import AsyncIterator
 import httpx
+import os
 import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Generous timeout: local models (e.g. 14B on a Colab GPU) can take well over 60s
+# on cold load or long RAG contexts. Override with OLLAMA_TIMEOUT (seconds).
+OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "300"))
 
 class OllamaProvider(ILLMProvider, IEmbeddingProvider):
     def __init__(self, base_url: str = "http://localhost:11434", api_key: str = None):
@@ -38,7 +43,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         if kwargs.get("response_format"):
             payload["format"] = "json"
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
@@ -74,7 +79,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
         if kwargs.get("response_format"):
             payload["format"] = "json"
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             async with client.stream(
                 "POST",
                 f"{self.base_url}/api/chat",
@@ -132,7 +137,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
                 "model": model,
                 "input": texts
             }
-            async with httpx.AsyncClient(timeout=60) as client:
+            async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
                 resp = await client.post(
                     f"{self.base_url}/api/embed",
                     json=payload,
@@ -147,7 +152,7 @@ class OllamaProvider(ILLMProvider, IEmbeddingProvider):
 
         # Fallback to sequential /api/embeddings for older Ollama versions
         embeddings = []
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             for text in texts:
                 payload = {
                     "model": model,

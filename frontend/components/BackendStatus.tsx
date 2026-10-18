@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, RefreshCw, Wifi, WifiOff, Clock, Server } from 'lucide-react'
+import { CheckCircle2, XCircle, RefreshCw, Wifi, WifiOff, Clock, Server, Cpu } from 'lucide-react'
+import BackendUrlSettings from './BackendUrlSettings'
+import { BACKEND_URL_CHANGED_EVENT } from '@/lib/backend-url'
 
 interface HealthData {
   status: string
@@ -9,6 +11,11 @@ interface HealthData {
   version: string
   environment: string
   timestamp: string
+  gpu?: {
+    name: string
+    memory_used_gb: number
+    memory_total_gb: number
+  } | null
 }
 
 type ConnectionStatus = 'checking' | 'connected' | 'error'
@@ -25,16 +32,15 @@ export default function BackendStatus({ compact = false }: BackendStatusProps) {
   const [lastChecked, setLastChecked] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const checkHealth = async () => {
-    setStatus('checking')
-    setError(null)
+  const checkHealth = useCallback(async () => {
     const start = performance.now()
 
     try {
       // Uses the Next.js /api proxy → rewrites to backend /health
+      // (or the runtime backend override, e.g. a Colab tunnel URL)
       const res = await fetch('/api/health', {
         cache: 'no-store',
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10000),
       })
 
       const elapsed = Math.round(performance.now() - start)
@@ -44,25 +50,46 @@ export default function BackendStatus({ compact = false }: BackendStatusProps) {
       if (res.ok) {
         const data: HealthData = await res.json()
         setHealth(data)
+        setError(null)
         setStatus('connected')
       } else {
         setError(`HTTP ${res.status}: ${res.statusText}`)
         setStatus('error')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLatency(null)
       setLastChecked(new Date())
-      setError(err?.message ?? 'Network error — backend may be down')
+      const errMsg = err instanceof Error ? err.message : 'Network error — backend may be down'
+      setError(errMsg)
       setStatus('error')
     }
-  }
+  }, [])
 
   useEffect(() => {
-    checkHealth()
+    // Initial fetch deferred to avoid synchronous setState during effect mount
+    const timer = setTimeout(() => {
+      void checkHealth()
+    }, 0)
+
     // Re-check every 30 seconds
-    const interval = setInterval(checkHealth, 30_000)
-    return () => clearInterval(interval)
-  }, [])
+    const interval = setInterval(() => {
+      setStatus('checking')
+      void checkHealth()
+    }, 30_000)
+
+    const handleUrlChange = () => {
+      setStatus('checking')
+      void checkHealth()
+    }
+
+    // Re-check immediately when the backend URL is switched at runtime
+    window.addEventListener(BACKEND_URL_CHANGED_EVENT, handleUrlChange)
+    return () => {
+      clearTimeout(timer)
+      clearInterval(interval)
+      window.removeEventListener(BACKEND_URL_CHANGED_EVENT, handleUrlChange)
+    }
+  }, [checkHealth])
 
   if (compact) {
     return (
@@ -166,6 +193,15 @@ export default function BackendStatus({ compact = false }: BackendStatusProps) {
           <Metric icon={<Clock className="w-3.5 h-3.5" />} label="Latency" value={latency !== null ? `${latency}ms` : '—'} />
           <Metric icon={<CheckCircle2 className="w-3.5 h-3.5" />} label="Version" value={`v${health.version}`} />
           <Metric icon={<Wifi className="w-3.5 h-3.5" />} label="Environment" value={health.environment} />
+          {health.gpu && (
+            <div className="col-span-2">
+              <Metric
+                icon={<Cpu className="w-3.5 h-3.5" />}
+                label="GPU"
+                value={`${health.gpu.name} · ${health.gpu.memory_used_gb.toFixed(1)} / ${health.gpu.memory_total_gb.toFixed(1)} GB`}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -182,6 +218,9 @@ export default function BackendStatus({ compact = false }: BackendStatusProps) {
           Last checked {lastChecked.toLocaleTimeString()}
         </p>
       )}
+
+      {/* Runtime backend URL (e.g. Google Colab tunnel) */}
+      <BackendUrlSettings />
     </div>
   )
 }

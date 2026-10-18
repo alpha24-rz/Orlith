@@ -1,4 +1,5 @@
 import { Workspace, Document, ChatMessage } from './types'
+import { getDirectBackendUrl } from './backend-url'
 
 // In the browser: use Next.js /api proxy (avoids CORS entirely)
 // In server-side: use the raw backend URL
@@ -132,7 +133,7 @@ export const api = {
     formData.append('ocr', ocr ? 'true' : 'false')
     
     // Bypass Next.js proxy for uploads due to Turbopack 404 bugs with large multipart requests
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const baseUrl = getDirectBackendUrl()
     const headers: any = {}
     
     if (typeof window !== 'undefined') {

@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { getApiBase } from '@/lib/backend-url'
 
-const API_URL = '/api' // Uses Next.js local proxy to avoid CORS
+const API_URL = '/api' // Uses Next.js local proxy to avoid CORS (overridden at runtime, see below)
 
 export const axiosClient = axios.create({
   baseURL: API_URL,
@@ -14,6 +15,9 @@ export const axiosClient = axios.create({
 // Request Interceptor: Attach JWT token if available
 axiosClient.interceptors.request.use(
   (config) => {
+    // Follow the runtime backend override (e.g. Colab tunnel URL) if one is set
+    config.baseURL = getApiBase()
+
     // Get token from Zustand store (or fallback to localStorage in browser)
     const token = useAuthStore.getState().token || (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null)
     if (token) {
