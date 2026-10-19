@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { CheckCircle2, XCircle, RefreshCw, Wifi, WifiOff, Clock, Server, Cpu } from 'lucide-react'
 import BackendUrlSettings from './BackendUrlSettings'
 import { BACKEND_URL_CHANGED_EVENT } from '@/lib/backend-url'
